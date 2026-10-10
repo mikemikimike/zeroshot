@@ -1729,17 +1729,8 @@ watch live runs, and replay recorded history.</p>
 </ul>
 <p>After validating those values, Zeroshot opens a durable ledger where it records each node result.
 Authored edges then route review, retries, and the final result.</p>
-<pre class="mermaid"><code>flowchart LR
-  I[Goal and source] --&gt; A[Admission]
-  A --&gt; W[Worker]
-  W --&gt; R1[Acceptance review]
-  W --&gt; R2[Code review]
-  R1 --&gt; D{Both accept?}
-  R2 --&gt; D
-  D -- no --&gt; F[Bounded repair]
-  F --&gt; R1
-  F --&gt; R2
-  D -- yes --&gt; X[Result or delivery]</code></pre>
+<p><a class="docs-graph-wide" href="assets/zeroshot-workflow.svg"><img alt="Zeroshot built-in workflow: implementation, parallel independent acceptance and code review, bounded repair, optional Git delivery, and delivery repair returning to both reviews." loading="lazy" src="assets/zeroshot-workflow.svg" /></a></p>
+<p><a class="docs-graph-tall" href="assets/zeroshot-workflow-mobile.svg"><img alt="Zeroshot built-in workflow: implementation, parallel independent acceptance and code review, bounded repair, optional Git delivery, and delivery repair returning to both reviews." loading="lazy" src="assets/zeroshot-workflow-mobile.svg" /></a></p>
 <p>The built-in <code>software-change</code> template uses the route shown above. For work that does not need its
 review loop, use <code>single-worker</code>. For ten rounds of measured, reversible research against a durable
 charter, use <code>auto-research</code>; custom graphs follow the same protocol contracts.</p>
