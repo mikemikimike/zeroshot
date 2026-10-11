@@ -1,0 +1,3 @@
+{
+  "task": "Add GET /health to this HTTP service. Acceptance criteria: it returns HTTP 200, Content-Type application/json, and exactly {\"status\":\"ok\"}; existing routes retain their behavior. Add a regression test using the repository's test framework. Start the service using the repository's documented development command and request /health over HTTP to check the response. Run the focused test and the repository's required checks. Report commands, exit statuses, and the observed HTTP status and body. If the service cannot start, report the blocker rather than claiming acceptance. Keep the change scoped to this endpoint and its tests."
+}

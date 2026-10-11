@@ -55,6 +55,7 @@ nav:
       - Targets: concepts/targets.md
   - Guides:
       - Prepare a runtime environment: guides/runtime-environments.md
+      - Use Claude Code as a QA agent: guides/claude-code-qa-agent.md
       - Build a review loop: guides/review-loop.md
       - Observe and control runs: guides/observe-and-control.md
       - Use a local graph as an ACP agent: guides/acp.md
