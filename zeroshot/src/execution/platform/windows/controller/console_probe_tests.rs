@@ -266,19 +266,28 @@ fn a_fixture(directory: &Path) {
     }
 }
 
-fn plain_leaf(directory: &Path, mode: &str) -> Child {
+struct ToolLeaf(Child);
+
+impl Drop for ToolLeaf {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn plain_leaf(directory: &Path, mode: &str) -> ToolLeaf {
     let mut command = fixture_command(TEST, MODE, mode).into_std();
     command
         .env(DIRECTORY, directory)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    command.spawn().unwrap()
+    ToolLeaf(command.spawn().unwrap())
 }
 
-fn leaf_exits(sender: &mut Child, control: &mut Child) -> Option<LeafExits> {
-    let sender = sender.try_wait().unwrap()?.code().unwrap() as u32;
-    let control = control.try_wait().unwrap()?.code().unwrap() as u32;
+fn leaf_exits(sender: &mut ToolLeaf, control: &mut ToolLeaf) -> Option<LeafExits> {
+    let sender = sender.0.try_wait().unwrap()?.code().unwrap() as u32;
+    let control = control.0.try_wait().unwrap()?.code().unwrap() as u32;
     Some(LeafExits { sender, control })
 }
 
