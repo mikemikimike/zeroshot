@@ -1323,6 +1323,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#per-node-lanes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-node lanes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Per-node lanes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1793,6 +1832,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#per-node-lanes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-node lanes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Per-node lanes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1857,9 +1935,9 @@
 
 
 <h1 id="runtimeplan">RuntimePlan<a class="headerlink" href="#runtimeplan" title="Permanent link">&para;</a></h1>
-<p>A <code>RuntimePlan</code> says how each executable node in a graph runs. It selects the harness, provider, and
-run size, and gives every <code>step</code> and <code>verifier</code> one binding. It contains model identifiers and
-connection field names, never secret values.</p>
+<p>A <code>RuntimePlan</code> says how each executable node in a graph runs. It selects the run size and a default
+harness and provider, and gives every <code>step</code> and <code>verifier</code> one binding. It contains model
+identifiers and connection field names, never secret values.</p>
 <p><a href="../../concepts/runtimes-and-connections/">Runtimes and connections</a> explains the concepts, and
 <a href="../../guides/review-loop/">Build a review loop</a> builds a complete plan for a custom graph. The Rust
 types in <code>openengine-cluster-protocol</code> are authoritative; the
@@ -1877,11 +1955,11 @@ machine-readable contract.</p>
 <tbody>
 <tr>
 <td><code>harness</code></td>
-<td><code>codex</code>, <code>claude</code>, or <code>copilot</code></td>
+<td>Harness of the default lane: <code>codex</code>, <code>claude</code>, or <code>copilot</code></td>
 </tr>
 <tr>
 <td><code>provider</code></td>
-<td>A provider supported by the selected harness</td>
+<td>Provider of the default lane, supported by the selected harness</td>
 </tr>
 <tr>
 <td><code>size</code></td>
@@ -1893,8 +1971,9 @@ machine-readable contract.</p>
 </tr>
 </tbody>
 </table>
-<p>One harness, provider, and size apply to the whole run. Model, effort, session scope, and
-connections are chosen per node.</p>
+<p><code>harness</code> and <code>provider</code> form the default lane. Every agent node runs on it unless its binding
+carries its own <a href="#per-node-lanes"><code>lane</code></a>. <code>size</code> applies to the whole run. Model, effort, session
+scope, and connections are chosen per node.</p>
 <p><code>size</code> is a run-level resource class. Zeroshot records it with the run and reports it in run
 status; the hosting target decides what resources each class receives.</p>
 <p><code>nodes</code> keys are graph node names: 1 to 128 bytes matching <code>[A-Za-z_][A-Za-z0-9_.-]*</code>.</p>
@@ -1935,7 +2014,8 @@ status; the hosting target decides what resources each class receives.</p>
 </tr>
 </tbody>
 </table>
-<p>Any other pair is rejected when the plan is read.</p>
+<p>The same pairs apply to an agent node's <a href="#per-node-lanes"><code>lane</code></a>. Any other pair is rejected when
+the plan is read.</p>
 <h2 id="node-bindings">Node bindings<a class="headerlink" href="#node-bindings" title="Permanent link">&para;</a></h2>
 <p><code>kind</code> selects one of two binding shapes. Fields that belong to the other kind are rejected.</p>
 <h3 id="agent"><code>agent</code><a class="headerlink" href="#agent" title="Permanent link">&para;</a></h3>
@@ -1952,6 +2032,11 @@ status; the hosting target decides what resources each class receives.</p>
 <td><code>kind</code></td>
 <td>Yes</td>
 <td><code>agent</code></td>
+</tr>
+<tr>
+<td><code>lane</code></td>
+<td>No</td>
+<td><a href="#per-node-lanes">Harness and provider</a>; default lane when omitted</td>
 </tr>
 <tr>
 <td><code>model</code></td>
@@ -2025,8 +2110,8 @@ replacement session silently.</p>
 </tr>
 </tbody>
 </table>
-<p>A <code>git_delivery</code> binding has no model, effort, or session scope. Admission accepts it only on a
-<code>verifier</code> node whose worker is one of the built-in delivery workers:</p>
+<p>A <code>git_delivery</code> binding has no model, effort, session scope, or lane. Admission accepts it only on
+a <code>verifier</code> node whose worker is one of the built-in delivery workers:</p>
 <table>
 <thead>
 <tr>
@@ -2069,6 +2154,77 @@ it, either as a <code>par</code> sibling or inside a <code>map</code> that can h
 may require exactly one delivery node; Zeroshot Cloud quick runs require one. See
 <a href="../../concepts/execution/#concurrent-workspace-changes">concurrent workspace changes</a>.</p>
 <p><code>ignore</code> skips pull-request discussion. CI, conflict, freshness, and merge-policy checks still apply.</p>
+<h2 id="per-node-lanes">Per-node lanes<a class="headerlink" href="#per-node-lanes" title="Permanent link">&para;</a></h2>
+<p>A lane is one harness and provider pair. The plan's <code>harness</code> and <code>provider</code> are the default lane
+for every agent node, and an <code>agent</code> binding can carry its own <code>lane</code>. A node's effective lane is
+its <code>lane</code>, or the default lane when it has none. <code>size</code> stays run-level.</p>
+<p>This plan binds the same four nodes as the <a href="#document-fields">first example</a>. <code>worker</code> and
+<code>review_repair</code> run on the default <code>codex</code>/<code>openai</code> lane, and both reviewers run on Claude Code:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"harness"</span><span class="p">:</span><span class="w"> </span><span class="s2">"codex"</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="s2">"medium"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"nodes"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">"worker"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"agent"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PROVIDER_MODEL_ID"</span><span class="p">,</span><span class="w"> </span><span class="nt">"sessionScope"</span><span class="p">:</span><span class="w"> </span><span class="s2">"node_instance"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">"acceptance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"agent"</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">"lane"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"harness"</span><span class="p">:</span><span class="w"> </span><span class="s2">"claude"</span><span class="p">,</span><span class="w"> </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"anthropic"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PROVIDER_MODEL_ID"</span><span class="p">,</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">"effort"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"agent"</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">"lane"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"harness"</span><span class="p">:</span><span class="w"> </span><span class="s2">"claude"</span><span class="p">,</span><span class="w"> </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"anthropic"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PROVIDER_MODEL_ID"</span><span class="p">,</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="nt">"effort"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nt">"review_repair"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"agent"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PROVIDER_MODEL_ID"</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">}</span>
+</code></pre></div>
+<p>Each <code>model</code> goes to the provider of its node's effective lane, so here <code>worker</code> and
+<code>review_repair</code> need OpenAI model identifiers and the reviewers need Anthropic ones.</p>
+<ul>
+<li><code>lane</code> accepts the same pairs as the run level, listed in
+  <a href="#harness-and-provider">Harness and provider</a>. An invalid pair is rejected when the plan is read.</li>
+<li>A <code>git_delivery</code> binding cannot carry a <code>lane</code>.</li>
+<li>A <code>lane</code> equal to the run-level pair is accepted, and the node runs exactly as it would without
+  one. It is still a <code>lane</code> field, so the <a href="#target-support">target support</a> check applies to it and
+  older binaries reject it. Omit <code>lane</code> when a node should use the default lane.</li>
+</ul>
+<p>Zeroshot starts one harness adapter for each distinct effective lane, and each node runs on its own
+lane's CLI. Model, effort, session scope, and connections stay per node. Provider access defaults
+also come from each node's effective lane; see <a href="#connections">Connections</a>.</p>
+<h3 id="target-support">Target support<a class="headerlink" href="#target-support" title="Permanent link">&para;</a></h3>
+<p>Targets that support lanes advertise <code>openengine.node-runtime-lanes/v1</code> in their discovery
+document. Before the CLI submits a run or stores a profile on a target, it checks the plan. If any
+node carries a <code>lane</code> and the target does not advertise the capability, the command fails after
+reading the target's discovery document and before it requests an access token or sends the plan:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>target operation failed: target does not support per-node runtime lanes (openengine.node-runtime-lanes/v1)
+</code></pre></div>
+<p>Plans without a <code>lane</code> are unchanged on the wire and work with every target. Older Zeroshot
+binaries reject a plan that contains a <code>lane</code> field when they read it.</p>
+<p>Local profiles are saved together in one file in the configuration store (<code>ZEROSHOT_CONFIG_DIR</code>).
+Once any local profile carries a <code>lane</code>, an older binary cannot read that file at all. Every local
+profile command, <code>--profile local:NAME</code> run, and <code>zeroshot acp</code> session then fails, including for
+profiles without lanes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>local controller operation failed: local profile store is malformed
+</code></pre></div>
+<p>To run an older binary beside a newer one, give it its own <code>ZEROSHOT_CONFIG_DIR</code>. To recover, remove
+the profile or its <code>lane</code> fields with the newer binary.</p>
+<h3 id="local-runs">Local runs<a class="headerlink" href="#local-runs" title="Permanent link">&para;</a></h3>
+<p>Before the controller starts, a local <code>zeroshot run</code> or <code>zeroshot resume</code> checks that each lane's
+executable, <code>codex</code>, <code>claude</code>, or <code>copilot</code>, is on <code>PATH</code>. A missing executable fails the command
+with a message such as:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>lane claude/anthropic needs the `claude` executable on PATH
+</code></pre></div>
+<p><code>zeroshot acp</code> runs the same check when each session opens, against that session's workspace, and
+the session request fails with the same message. When every <code>PATH</code> entry is absolute, it also
+checks at startup. An empty or relative entry resolves against the directory the harness starts in,
+which is known only per session, so then the startup check is skipped. The check does not inspect login state; a missing login surfaces at
+that lane's first turn. As in a single-lane run, local <code>codex</code>/<code>openai</code>, <code>claude</code>/<code>anthropic</code>, and
+<code>copilot</code>/<code>github</code> lanes reuse their harness's native login, and other lanes need their provider's
+connection fields; see <a href="#connections">Connections</a>.</p>
 <h2 id="coverage">Coverage<a class="headerlink" href="#coverage" title="Permanent link">&para;</a></h2>
 <p><code>nodes</code> contains exactly one binding for every <code>step</code> and <code>verifier</code> in the graph, keyed by the node
 name. Structural nodes (<code>seq</code>, <code>choice</code>, <code>par</code>, <code>loop</code>, <code>map</code>) and terminal nodes (<code>succeed</code>,
@@ -2084,11 +2240,11 @@ name. Structural nodes (<code>seq</code>, <code>choice</code>, <code>par</code>,
 <h2 id="connections">Connections<a class="headerlink" href="#connections" title="Permanent link">&para;</a></h2>
 <p><code>connections</code> maps a connection key to the exact environment field names the node may receive.
 Values come from the submission environment or a target connection store at run time.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"connections"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"gateway"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"GATEWAY_BASE_URL"</span><span class="p">,</span><span class="w"> </span><span class="s2">"GATEWAY_API_KEY"</span><span class="p">]</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"connections"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">"gateway"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"GATEWAY_BASE_URL"</span><span class="p">,</span><span class="w"> </span><span class="s2">"GATEWAY_API_KEY"</span><span class="p">]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">}</span>
 </code></pre></div>
 <table>
 <thead>
@@ -2127,10 +2283,12 @@ Values come from the submission environment or a target connection store at run 
 <p>The per-run limit also counts the connection fields and variable names of an attached runtime
 environment. Each connection value must be 1 byte to 64 KiB with no NUL. The static connection
 values supplied for one run, counting each key and field name with its value, must fit in 256 KiB.</p>
-<p>When a node omits <code>connections</code>, Zeroshot derives provider access for the execution placement.
-Local native logins need no declaration; contained targets and non-native providers receive the
-canonical requirements listed in
-<a href="../../concepts/runtimes-and-connections/#runtime-configuration-contains-names-not-secret-values">Runtimes and connections</a>.</p>
+<p>When a node omits <code>connections</code>, Zeroshot derives provider access from that node's
+<a href="#per-node-lanes">effective lane</a> for the execution placement. Local native logins need no
+declaration; contained targets and non-native providers receive the canonical requirements listed in
+<a href="../../concepts/runtimes-and-connections/#runtime-configuration-contains-names-not-secret-values">Runtimes and connections</a>.
+A run's connection requirements are the union over its nodes, so a plan that mixes lanes can require
+the fields of several providers.</p>
 <h2 id="uniform-runtime-configuration">Uniform runtime configuration<a class="headerlink" href="#uniform-runtime-configuration" title="Permanent link">&para;</a></h2>
 <p><code>--uniform-runtime-config</code> accepts a single agent configuration and expands it into a full plan:</p>
 <table>
@@ -2181,6 +2339,9 @@ canonical requirements listed in
 </table>
 <p>Every executable node gets an <code>agent</code> binding with these values, except nodes that use a delivery
 worker. Those get a <code>git_delivery</code> binding that declares <code>{"github": ["GH_TOKEN"]}</code>.</p>
+<p>A uniform configuration applies one lane to every agent node. Neither <code>--uniform-runtime-config</code> nor
+the Python SDK's <code>UniformRuntime</code> can express <a href="#per-node-lanes">per-node lanes</a>; use an exact
+<code>--runtime-config</code> or an opaque <code>RuntimePlan</code> instead.</p>
 <h2 id="template-delivery-bindings">Template delivery bindings<a class="headerlink" href="#template-delivery-bindings" title="Permanent link">&para;</a></h2>
 <p>Built-in templates own their delivery nodes. With <code>software-change</code>, <code>--push</code>, <code>--pr</code>, and <code>--ship</code>
 add a delivery verifier named <code>deliver</code> and a <code>delivery_repair</code> step. With <code>auto-research</code>, <code>--push</code>
@@ -2214,7 +2375,7 @@ with <code>zeroshot template show TEMPLATE</code> plus the same delivery flag.</
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-05">5 October 2026</time>
+    Last updated <time datetime="2026-10-13">13 October 2026</time>
   </span>
 
     
