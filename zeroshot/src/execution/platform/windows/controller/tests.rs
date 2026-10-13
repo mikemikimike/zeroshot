@@ -378,3 +378,6 @@ impl Drop for Scratch {
         let _ = std::fs::remove_file(&self.0);
     }
 }
+
+#[path = "console_probe_tests.rs"]
+mod console_probe_tests;
