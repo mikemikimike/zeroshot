@@ -73,10 +73,11 @@ async fn owned_job_and_break0_diagnostic() {
         }
         return;
     }
-    let directory = tempfile::tempdir().unwrap();
-    crate::execution::platform::private_directory(directory.path()).unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let directory = scratch.path().join("private");
+    crate::execution::platform::create_private_directory(&directory).unwrap();
     let mut command = fixture_command(TEST, MODE, "controller");
-    command.env(DIRECTORY, directory.path());
+    command.env(DIRECTORY, &directory);
     let mut controller = spawn_controller(&mut command).unwrap();
     let exited = wait_for(Duration::from_secs(60), || {
         controller.try_wait().unwrap().is_some()
@@ -84,15 +85,19 @@ async fn owned_job_and_break0_diagnostic() {
     .await;
     controller.kill().await.unwrap();
     assert!(
-        exited && directory.path().join("evidence.json").is_file(),
+        exited && directory.join("evidence.json").is_file(),
         "console probe failed: {}",
-        std::fs::read_to_string(directory.path().join("failure.txt"))
+        std::fs::read_to_string(directory.join("failure.txt"))
             .unwrap_or_else(|_| "controller did not finish".into())
     );
-    let evidence: Vec<Evidence> = read_json(&directory.path().join("evidence.json"));
+    let evidence: Vec<Evidence> = read_json(&directory.join("evidence.json"));
     assert_eq!(evidence.len(), 2);
     for record in evidence {
-        println!("console-probe {}", serde_json::to_string(&record).unwrap());
+        let line = format!(
+            "console-probe {}\n",
+            serde_json::to_string(&record).unwrap()
+        );
+        std::io::Write::write_all(&mut std::io::stdout().lock(), line.as_bytes()).unwrap();
     }
 }
 
