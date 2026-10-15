@@ -1,0 +1,593 @@
+{
+  "note": "Wall-clock minutes from a run's submission to the snapshot after the named build (the runner's per-attempt timestamps). sol: each Sol single worker's build 1. parity: each Luna loop run's parity build (bench parity). match: each loop run's deliverable build at the cost-to-match budget (bench match; 0 for a run with no build within it, null for a task whose loops never reach Sol's mean score).",
+  "tasks": {
+    "ascii-image-converter": {
+      "loop_match_build": {
+        "01-loop": 360.02,
+        "02-loop": 193.82,
+        "03-loop": 205.52,
+        "04-loop": 325.74,
+        "05-loop": 277.21
+      },
+      "loop_parity_build": {
+        "01-loop": 308.38,
+        "02-loop": 161.64,
+        "03-loop": 157.03,
+        "04-loop": 278.78,
+        "05-loop": 243.56
+      },
+      "match_deliverables": {
+        "01-loop": 27,
+        "02-loop": 50,
+        "03-loop": 48,
+        "04-loop": 39,
+        "05-loop": 44
+      },
+      "sol_build1": {
+        "01-single": 12.58,
+        "02-single": 16.91,
+        "03-single": 22.76,
+        "04-single": 13.97,
+        "05-single": 13.79
+      }
+    },
+    "calcurse": {
+      "loop_match_build": {
+        "01-loop": 46.98,
+        "02-loop": 49.16,
+        "03-loop": 52.54,
+        "04-loop": 45.34,
+        "05-loop": 55.03
+      },
+      "loop_parity_build": {
+        "01-loop": 144.59,
+        "02-loop": 141.04,
+        "03-loop": 145.96,
+        "04-loop": 149.28,
+        "05-loop": 142.75
+      },
+      "match_deliverables": {
+        "01-loop": 7,
+        "02-loop": 9,
+        "03-loop": 13,
+        "04-loop": 8,
+        "05-loop": 12
+      },
+      "sol_build1": {
+        "01-single": 8.5,
+        "02-single": 8.4,
+        "03-single": 7.74,
+        "04-single": 7.27,
+        "05-single": 7.37
+      }
+    },
+    "crowbook": {
+      "loop_match_build": {
+        "01-loop": 95.95,
+        "02-loop": 92.11,
+        "03-loop": 78.1,
+        "04-loop": 93.11,
+        "05-loop": 92.51
+      },
+      "loop_parity_build": {
+        "01-loop": 107.65,
+        "02-loop": 98.33,
+        "03-loop": 100.75,
+        "04-loop": 102.34,
+        "05-loop": 110.94
+      },
+      "match_deliverables": {
+        "01-loop": 15,
+        "02-loop": 13,
+        "03-loop": 10,
+        "04-loop": 15,
+        "05-loop": 20
+      },
+      "sol_build1": {
+        "01-single": 9.65,
+        "02-single": 10.54,
+        "03-single": 8.57,
+        "04-single": 8.38,
+        "05-single": 7.11
+      }
+    },
+    "datasurgeon": {
+      "loop_match_build": null,
+      "loop_parity_build": {
+        "01-loop": 100.4,
+        "02-loop": 101.0,
+        "03-loop": 106.19,
+        "04-loop": 142.78,
+        "05-loop": 137.12
+      },
+      "match_deliverables": {
+        "01-loop": 44,
+        "02-loop": 50,
+        "03-loop": 50,
+        "04-loop": 50,
+        "05-loop": 50
+      },
+      "sol_build1": {
+        "01-single": 8.15,
+        "02-single": 7.62,
+        "03-single": 8.25,
+        "04-single": 7.29,
+        "05-single": 4.77
+      }
+    },
+    "direnv": {
+      "loop_match_build": {
+        "01-loop": 66.19,
+        "02-loop": 64.07,
+        "03-loop": 67.36,
+        "04-loop": 59.73,
+        "05-loop": 69.86
+      },
+      "loop_parity_build": {
+        "01-loop": 173.82,
+        "02-loop": 180.86,
+        "03-loop": 173.38,
+        "04-loop": 171.54,
+        "05-loop": 184.32
+      },
+      "match_deliverables": {
+        "01-loop": 10,
+        "02-loop": 9,
+        "03-loop": 11,
+        "04-loop": 9,
+        "05-loop": 13
+      },
+      "sol_build1": {
+        "01-single": 12.19,
+        "02-single": 10.22,
+        "03-single": 14.54,
+        "04-single": 14.93,
+        "05-single": 9.08
+      }
+    },
+    "ditaa": {
+      "loop_match_build": {
+        "01-loop": 7.73,
+        "02-loop": 10.52,
+        "03-loop": 12.54,
+        "04-loop": 0.0,
+        "05-loop": 9.35
+      },
+      "loop_parity_build": {
+        "01-loop": 163.33,
+        "02-loop": 356.55,
+        "03-loop": 149.16,
+        "04-loop": 143.58,
+        "05-loop": 149.43
+      },
+      "match_deliverables": {
+        "01-loop": 1,
+        "02-loop": 1,
+        "03-loop": 1,
+        "04-loop": 0,
+        "05-loop": 1
+      },
+      "sol_build1": {
+        "01-single": 13.38,
+        "02-single": 5.8,
+        "03-single": 12.31,
+        "04-single": 8.31,
+        "05-single": 10.61
+      }
+    },
+    "dstask": {
+      "loop_match_build": {
+        "01-loop": 43.03,
+        "02-loop": 45.36,
+        "03-loop": 43.42,
+        "04-loop": 46.56,
+        "05-loop": 45.54
+      },
+      "loop_parity_build": {
+        "01-loop": 161.51,
+        "02-loop": 170.03,
+        "03-loop": 168.32,
+        "04-loop": 158.25,
+        "05-loop": 168.25
+      },
+      "match_deliverables": {
+        "01-loop": 8,
+        "02-loop": 7,
+        "03-loop": 9,
+        "04-loop": 8,
+        "05-loop": 8
+      },
+      "sol_build1": {
+        "01-single": 16.78,
+        "02-single": 15.81,
+        "03-single": 7.95,
+        "04-single": 13.85,
+        "05-single": 8.65
+      }
+    },
+    "dust": {
+      "loop_match_build": {
+        "01-loop": 80.0,
+        "02-loop": 91.79,
+        "03-loop": 88.66,
+        "04-loop": 84.63,
+        "05-loop": 84.62
+      },
+      "loop_parity_build": {
+        "01-loop": 129.02,
+        "02-loop": 128.89,
+        "03-loop": 131.36,
+        "04-loop": 128.59,
+        "05-loop": 128.14
+      },
+      "match_deliverables": {
+        "01-loop": 16,
+        "02-loop": 21,
+        "03-loop": 21,
+        "04-loop": 15,
+        "05-loop": 18
+      },
+      "sol_build1": {
+        "01-single": 9.46,
+        "02-single": 10.24,
+        "03-single": 11.0,
+        "04-single": 14.72,
+        "05-single": 12.0
+      }
+    },
+    "fasttext": {
+      "loop_match_build": {
+        "01-loop": 65.64,
+        "02-loop": 73.41,
+        "03-loop": 70.85,
+        "04-loop": 67.06,
+        "05-loop": 82.28
+      },
+      "loop_parity_build": {
+        "01-loop": 82.95,
+        "02-loop": 86.64,
+        "03-loop": 90.41,
+        "04-loop": 84.98,
+        "05-loop": 104.91
+      },
+      "match_deliverables": {
+        "01-loop": 8,
+        "02-loop": 9,
+        "03-loop": 21,
+        "04-loop": 13,
+        "05-loop": 14
+      },
+      "sol_build1": {
+        "01-single": 8.82,
+        "02-single": 5.79,
+        "03-single": 7.66,
+        "04-single": 5.74,
+        "05-single": 11.21
+      }
+    },
+    "gdu": {
+      "loop_match_build": {
+        "01-loop": 61.29,
+        "02-loop": 61.61,
+        "03-loop": 65.93,
+        "04-loop": 54.39,
+        "05-loop": 65.44
+      },
+      "loop_parity_build": {
+        "01-loop": 137.94,
+        "02-loop": 137.02,
+        "03-loop": 136.81,
+        "04-loop": 133.61,
+        "05-loop": 140.94
+      },
+      "match_deliverables": {
+        "01-loop": 12,
+        "02-loop": 13,
+        "03-loop": 12,
+        "04-loop": 8,
+        "05-loop": 13
+      },
+      "sol_build1": {
+        "01-single": 12.13,
+        "02-single": 9.16,
+        "03-single": 13.27,
+        "04-single": 10.8,
+        "05-single": 9.44
+      }
+    },
+    "gittype": {
+      "loop_match_build": {
+        "01-loop": 29.0,
+        "02-loop": 33.8,
+        "03-loop": 31.72,
+        "04-loop": 41.71,
+        "05-loop": 35.21
+      },
+      "loop_parity_build": {
+        "01-loop": 177.43,
+        "02-loop": 191.61,
+        "03-loop": 206.82,
+        "04-loop": 178.8,
+        "05-loop": 197.58
+      },
+      "match_deliverables": {
+        "01-loop": 7,
+        "02-loop": 6,
+        "03-loop": 9,
+        "04-loop": 10,
+        "05-loop": 10
+      },
+      "sol_build1": {
+        "01-single": 13.53,
+        "02-single": 13.23,
+        "03-single": 21.71,
+        "04-single": 9.6,
+        "05-single": 12.28
+      }
+    },
+    "igrep": {
+      "loop_match_build": {
+        "01-loop": 136.95,
+        "02-loop": 132.48,
+        "03-loop": 136.18,
+        "04-loop": 116.26,
+        "05-loop": 124.39
+      },
+      "loop_parity_build": {
+        "01-loop": 152.44,
+        "02-loop": 152.01,
+        "03-loop": 156.24,
+        "04-loop": 131.48,
+        "05-loop": 141.73
+      },
+      "match_deliverables": {
+        "01-loop": 36,
+        "02-loop": 31,
+        "03-loop": 27,
+        "04-loop": 23,
+        "05-loop": 31
+      },
+      "sol_build1": {
+        "01-single": 9.82,
+        "02-single": 10.75,
+        "03-single": 11.31,
+        "04-single": 8.44,
+        "05-single": 7.76
+      }
+    },
+    "keifu": {
+      "loop_match_build": {
+        "01-loop": 134.75,
+        "02-loop": 129.32,
+        "03-loop": 106.39,
+        "04-loop": 122.99,
+        "05-loop": 120.29
+      },
+      "loop_parity_build": {
+        "01-loop": 263.72,
+        "02-loop": 276.91,
+        "03-loop": 247.82,
+        "04-loop": 218.14,
+        "05-loop": 120.29
+      },
+      "match_deliverables": {
+        "01-loop": 27,
+        "02-loop": 24,
+        "03-loop": 19,
+        "04-loop": 21,
+        "05-loop": 23
+      },
+      "sol_build1": {
+        "01-single": 18.74,
+        "02-single": 16.1,
+        "03-single": 21.12,
+        "04-single": 28.31,
+        "05-single": 18.34
+      }
+    },
+    "marmite": {
+      "loop_match_build": {
+        "01-loop": 188.34,
+        "02-loop": 205.98,
+        "03-loop": 182.46,
+        "04-loop": 171.19,
+        "05-loop": 174.96
+      },
+      "loop_parity_build": {
+        "01-loop": 123.8,
+        "02-loop": 124.53,
+        "03-loop": 112.95,
+        "04-loop": 102.98,
+        "05-loop": 102.03
+      },
+      "match_deliverables": {
+        "01-loop": 50,
+        "02-loop": 48,
+        "03-loop": 44,
+        "04-loop": 33,
+        "05-loop": 42
+      },
+      "sol_build1": {
+        "01-single": 8.76,
+        "02-single": 11.66,
+        "03-single": 9.97,
+        "04-single": 13.72,
+        "05-single": 13.34
+      }
+    },
+    "parqeye": {
+      "loop_match_build": {
+        "01-loop": 128.21,
+        "02-loop": 125.29,
+        "03-loop": 149.06,
+        "04-loop": 124.7,
+        "05-loop": 112.38
+      },
+      "loop_parity_build": {
+        "01-loop": 325.57,
+        "02-loop": 276.5,
+        "03-loop": 295.62,
+        "04-loop": 280.23,
+        "05-loop": 280.18
+      },
+      "match_deliverables": {
+        "01-loop": 17,
+        "02-loop": 17,
+        "03-loop": 24,
+        "04-loop": 15,
+        "05-loop": 11
+      },
+      "sol_build1": {
+        "01-single": 18.14,
+        "02-single": 18.19,
+        "03-single": 17.55,
+        "04-single": 18.96,
+        "05-single": 10.23
+      }
+    },
+    "revive": {
+      "loop_match_build": {
+        "01-loop": 17.45,
+        "02-loop": 15.26,
+        "03-loop": 12.33,
+        "04-loop": 15.71,
+        "05-loop": 15.6
+      },
+      "loop_parity_build": {
+        "01-loop": 124.09,
+        "02-loop": 120.42,
+        "03-loop": 116.12,
+        "04-loop": 128.23,
+        "05-loop": 127.04
+      },
+      "match_deliverables": {
+        "01-loop": 5,
+        "02-loop": 3,
+        "03-loop": 2,
+        "04-loop": 2,
+        "05-loop": 2
+      },
+      "sol_build1": {
+        "01-single": 7.91,
+        "02-single": 8.28,
+        "03-single": 8.43,
+        "04-single": 9.69,
+        "05-single": 8.77
+      }
+    },
+    "samtools": {
+      "loop_match_build": {
+        "01-loop": 58.69,
+        "02-loop": 74.73,
+        "03-loop": 52.35,
+        "04-loop": 68.48,
+        "05-loop": 60.94
+      },
+      "loop_parity_build": {
+        "01-loop": 90.67,
+        "02-loop": 97.9,
+        "03-loop": 89.77,
+        "04-loop": 95.59,
+        "05-loop": 86.29
+      },
+      "match_deliverables": {
+        "01-loop": 14,
+        "02-loop": 9,
+        "03-loop": 10,
+        "04-loop": 9,
+        "05-loop": 11
+      },
+      "sol_build1": {
+        "01-single": 11.57,
+        "02-single": 9.01,
+        "03-single": 11.18,
+        "04-single": 6.47,
+        "05-single": 7.56
+      }
+    },
+    "svgbob": {
+      "loop_match_build": {
+        "01-loop": 170.19,
+        "02-loop": 163.73,
+        "03-loop": 214.85,
+        "04-loop": 175.93,
+        "05-loop": 192.37
+      },
+      "loop_parity_build": {
+        "01-loop": 99.97,
+        "02-loop": 90.92,
+        "03-loop": 108.36,
+        "04-loop": 102.03,
+        "05-loop": 101.56
+      },
+      "match_deliverables": {
+        "01-loop": 50,
+        "02-loop": 50,
+        "03-loop": 44,
+        "04-loop": 50,
+        "05-loop": 43
+      },
+      "sol_build1": {
+        "01-single": 9.12,
+        "02-single": 13.19,
+        "03-single": 16.4,
+        "04-single": 7.7,
+        "05-single": 10.33
+      }
+    },
+    "tree-sitter": {
+      "loop_match_build": {
+        "01-loop": 34.55,
+        "02-loop": 37.43,
+        "03-loop": 39.9,
+        "04-loop": 43.11,
+        "05-loop": 40.12
+      },
+      "loop_parity_build": {
+        "01-loop": 114.18,
+        "02-loop": 115.01,
+        "03-loop": 106.19,
+        "04-loop": 124.3,
+        "05-loop": 115.48
+      },
+      "match_deliverables": {
+        "01-loop": 7,
+        "02-loop": 8,
+        "03-loop": 7,
+        "04-loop": 8,
+        "05-loop": 7
+      },
+      "sol_build1": {
+        "01-single": 6.84,
+        "02-single": 11.82,
+        "03-single": 10.68,
+        "04-single": 9.76,
+        "05-single": 11.8
+      }
+    },
+    "xz": {
+      "loop_match_build": null,
+      "loop_parity_build": {
+        "01-loop": 143.05,
+        "02-loop": 135.24,
+        "03-loop": 127.62,
+        "04-loop": 142.75,
+        "05-loop": 171.27
+      },
+      "match_deliverables": {
+        "01-loop": 50,
+        "02-loop": 50,
+        "03-loop": 50,
+        "04-loop": 50,
+        "05-loop": 50
+      },
+      "sol_build1": {
+        "01-single": 11.14,
+        "02-single": 15.0,
+        "03-single": 10.83,
+        "04-single": 12.0,
+        "05-single": 12.36
+      }
+    }
+  }
+}

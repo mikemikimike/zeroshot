@@ -1,0 +1,147 @@
+"""Token usage and cost, priced from Codex's own session transcripts.
+
+Zeroshot's ledger cannot be summed directly: when a node resumes the same Codex thread (the
+builder uses ``sessionScope: node_instance``), Codex reports the thread's running total and the
+ledger stores it as that execution's usage, so later builder rounds would be counted again. Each
+Codex transcript (``rollout-*.jsonl``) is one thread; its last ``token_count`` event carries the
+thread's true cumulative usage. Every graph execution of a node starts with the node's prompt
+("Authored instructions"), so the totals at those prompts split a thread into rounds. One round
+can span several Codex turns (Zeroshot continues a turn after a provider error, or asks for a
+corrected response), which is why turns are not used.
+"""
+
+from __future__ import annotations
+
+import json
+import tarfile
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+
+from . import ledger
+from .config import node_of
+
+FIELDS = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+_CODEX = {"input_tokens": "inputTokens", "output_tokens": "outputTokens", "cached_input_tokens": "cacheReadInputTokens", "cache_write_input_tokens": "cacheCreationInputTokens"}
+
+
+def _zero() -> dict[str, int]:
+    return dict.fromkeys(FIELDS, 0)
+
+
+def _from_codex(usage: dict[str, Any]) -> dict[str, int]:
+    return {ours: int(usage.get(theirs) or 0) for theirs, ours in _CODEX.items()}
+
+
+def _minus(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+    return {k: a[k] - b[k] for k in FIELDS}
+
+
+def _add(a: dict[str, int], b: dict[str, int]) -> None:
+    for k in FIELDS:
+        a[k] += b[k]
+
+
+def node_of_session(first_prompt: str) -> str:
+    return node_of(first_prompt)
+
+
+def is_node_prompt(record: dict[str, Any]) -> bool:
+    """The user message that starts one graph execution of a node."""
+    payload = record.get("payload") or {}
+    if payload.get("type") != "message" or payload.get("role") != "user":
+        return False
+    return any("Authored instructions" in str(c.get("text", "")) for c in payload.get("content") or [] if isinstance(c, dict))
+
+
+def sessions(trajectories: Path) -> list[dict[str, Any]]:
+    """One record per Codex thread: its node, cumulative usage, and usage per round."""
+    out = []
+    if not trajectories.exists():
+        return out
+    with tarfile.open(trajectories) as tar:
+        for member in tar:
+            if not (member.isfile() and "/sessions/" in member.name and member.name.endswith(".jsonl")):
+                continue
+            data = tar.extractfile(member)
+            if data is None:
+                continue
+            first_prompt, total, rounds, round_start, decreased = "", _zero(), [], None, False
+            for line in data.read().splitlines():
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                payload = record.get("payload") or {}
+                if is_node_prompt(record):
+                    if not first_prompt:
+                        first_prompt = " ".join(str(c.get("text", "")) for c in payload.get("content") or [] if isinstance(c, dict))
+                    if round_start is not None:
+                        rounds.append(_minus(total, round_start))
+                    round_start = dict(total)
+                elif payload.get("type") == "token_count" and (payload.get("info") or {}).get("total_token_usage"):
+                    new_total = _from_codex(payload["info"]["total_token_usage"])
+                    decreased |= any(new_total[k] < total[k] for k in FIELDS)  # cumulative usage must not shrink
+                    total = new_total
+            if round_start is not None:
+                rounds.append(_minus(total, round_start))
+            elif total != _zero():  # usage without any node prompt
+                rounds.append(dict(total))
+            out.append({"file": member.name, "node": node_of_session(first_prompt), "total": total, "rounds": rounds, "usage_decreased": decreased})
+    return out
+
+
+def usage(attempt_dir: Path) -> dict[str, Any]:
+    """Per-node and total usage from transcripts, the first build round separately, and the
+    ledger's figure for comparison."""
+    per_node: dict[str, dict[str, int]] = defaultdict(_zero)
+    first_build_round = None
+    # Transcript names start with their creation time, so the earliest builder thread holds build
+    # 1 (a build error makes Zeroshot start a new thread for the next round).
+    records = sorted(sessions(attempt_dir / "trajectories.tar.gz"), key=lambda s: Path(s["file"]).name)
+    for session in records:
+        _add(per_node[session["node"]], session["total"])
+        _add(per_node["total"], session["total"])
+        if session["node"] == "build" and session["rounds"] and first_build_round is None:
+            first_build_round = dict(session["rounds"][0])
+    ledger_events = ledger.events(attempt_dir / "trajectories.tar.gz")
+    ledger_nodes = usage_from_events(ledger_events) if ledger_events else {}
+    return {
+        "nodes": dict(per_node),
+        "first_build_round": first_build_round,
+        "sessions": [{"node": s["node"], "rounds": len(s["rounds"]), "total": s["total"], "usage_decreased": s["usage_decreased"]} for s in records],
+        "ledger_total": ledger_nodes.get("total"),
+        "ledger_nodes": ledger_nodes,
+    }
+
+
+def usage_from_events(events: Iterable[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Zeroshot ledger view (kept as a cross-check; over-counts resumed builder rounds)."""
+    node_of_execution: dict[int, str] = {}
+    totals: dict[str, dict[str, int]] = defaultdict(_zero)
+    for event in events:
+        if event.get("kind") == "node_started":
+            reference = event.get("reference") or {}
+            node_of_execution[int(reference.get("execution", -1))] = reference.get("node", "?")
+        elif event.get("kind") == "token_usage_observed":
+            node = node_of_execution.get(int(event.get("execution", -1)), "?")
+            observed = event.get("usage") or {}
+            for field in FIELDS:
+                value = int(observed.get(field) or 0)
+                totals[node][field] += value
+                totals["total"][field] += value
+    return {node: dict(values) for node, values in totals.items()}
+
+
+def cost(tokens: dict[str, int], pricing: dict[str, Any]) -> float:
+    price = pricing["usd_per_million_tokens"]
+    cache_read = tokens.get("cacheReadInputTokens", 0)
+    cache_write = tokens.get("cacheCreationInputTokens", 0)
+    uncached = max(0, tokens.get("inputTokens", 0) - cache_read - cache_write)
+    return (
+        uncached * price["input"]
+        + cache_read * price["cached_input"]
+        + cache_write * price["cache_write"]
+        + tokens.get("outputTokens", 0) * price["output"]
+    ) / 1_000_000

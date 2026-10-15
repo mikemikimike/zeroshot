@@ -1,0 +1,64 @@
+{
+  "id": "sol-xhigh-tree-sitter-single",
+  "description": "5 single GPT-5.6 Sol workers at xhigh on tree-sitter (incremental parsing library for building syntax-aware programming tools, written in Rust). A single worker is the build node alone, byte-identical to round 1 of luna-xhigh-tree-sitter-v1's loop (same prompt, environment, node and limits). Their mean model cost and mean score are what that loop is compared at (bench parity, bench match).",
+  "task": {
+    "instance_id": "tree-sitter__tree-sitter.5e23cca",
+    "image": "programbench/tree-sitter_1776_tree-sitter.5e23cca:task_cleanroom_v6@sha256:0f3e37c08718e68d6881da1b21a1edaf41d25b2f68a657cfd2707fd29aa9ceb7",
+    "reference_path": "/reference/executable",
+    "adjustments_rationale": "The reference moves to a root-owned directory outside the workspace (the task statement points there), so builders cannot overwrite or delete it at the build target's path. This adjustment is general, not specific to the task. The bundled documentation is left as shipped: no task-specific corrections.",
+    "fidelity_reference": {
+      "submission": "20260508_mini-v2.2.6_gpt-5-5-xhigh",
+      "commit": "530a7b8f969840d17efac1e1e5aaca1078cc2b3a",
+      "archive_url": "https://huggingface.co/datasets/programbench/20260508_mini-v2.2.6_gpt-5-5-xhigh/resolve/main/tree-sitter__tree-sitter.5e23cca/submission.tar.gz",
+      "archive_sha256": "2c691d140ee41d4534dbaca63d056b7fa26ae7ebd5587c607f2dd3865025e89d",
+      "registry_commit": "794fa30bbfd65059d5c67e192ceb6da659c9ef51"
+    }
+  },
+  "model": {
+    "id": "gpt-5.6-sol",
+    "effort": "xhigh"
+  },
+  "arms": {
+    "single": {
+      "repeats": 5
+    }
+  },
+  "order": [
+    "single",
+    "single",
+    "single",
+    "single",
+    "single"
+  ],
+  "limits": {
+    "attempt_seconds": 21600,
+    "build_timeout_ms": 10800000,
+    "check_timeout_ms": 3600000
+  },
+  "resources": {
+    "concurrency": 5,
+    "cpus": 4,
+    "memory": "7g",
+    "pids_limit": 65536
+  },
+  "eval": {
+    "workers": 8,
+    "docker_cpus": 3,
+    "timeout_seconds": 43200,
+    "rounds": [
+      1
+    ]
+  },
+  "pricing": {
+    "model": "gpt-5.6-sol",
+    "usd_per_million_tokens": {
+      "input": 4.0,
+      "cached_input": 0.4,
+      "cache_write": 5.0,
+      "output": 20.0
+    },
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "retrieved": "2026-09-25",
+    "note": "standard-tier promotional prices, available at least through 2026-11-21; Codex prompts stay under the 272K long-context threshold"
+  }
+}
