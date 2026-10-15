@@ -609,6 +609,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#renewable-local-github-delivery-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renewable local GitHub delivery credentials
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trusted-local-delivery-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted local delivery validation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1742,6 +1764,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#renewable-local-github-delivery-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renewable local GitHub delivery credentials
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trusted-local-delivery-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted local delivery validation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1897,6 +1941,27 @@ JSON and run history. Exact plans declare these fields under any chosen connecti
 <p>Docker runtimes can prepare shared tools, project dependencies, and services with setup and
 startup hooks. See <a href="../../guides/runtime-environments/">Prepare a runtime environment</a> for the
 installation conventions, resume behavior, and direct-target ownership boundary.</p>
+<h2 id="renewable-local-github-delivery-credentials">Renewable local GitHub delivery credentials<a class="headerlink" href="#renewable-local-github-delivery-credentials" title="Permanent link">&para;</a></h2>
+<p>A trusted local host can set <code>ZEROSHOT_GITHUB_TOKEN_FILE</code> to a private token file outside the
+checkout. Use a delivery binding with <code>"connections": {}</code>: the controller receives the credential
+without adding it to agent bindings. The file contains one token, optionally followed by a newline.
+It must be a regular file owned by the controller user with no access for other users.</p>
+<p>The host obtains short-lived tokens and renews them by atomically replacing the file. Mount its
+parent directory if the host writes outside a container. Zeroshot reopens the path on each delivery
+visit and after authentication rejection; an unchanged rejected token waits for host renewal.
+Explicit <code>GH_TOKEN</code> takes precedence, including failing on an empty or malformed value.</p>
+<p>The file setting and credential stay out of provider environments, profiles, run history, and
+recovery metadata. Resume selects the caller's current setting again and retains the delivery
+branch identity. This keeps credentials out of agent environments; it does not isolate a trusted
+controller from other processes running as the same OS user. Named targets continue to use their
+existing credential resolver.</p>
+<h2 id="trusted-local-delivery-validation">Trusted local delivery validation<a class="headerlink" href="#trusted-local-delivery-validation" title="Permanent link">&para;</a></h2>
+<p>Set <code>ZEROSHOT_DELIVERY_CHECK_COMMAND</code> to one absolute executable path outside the checkout to
+validate publication and merge candidates. It must be private to the controller user and executable;
+this setting accepts no command arguments or shell expression. The controller owns its process and
+passes candidate facts through the <a href="../delivery-validation/">delivery validation protocol</a>. The caller selects this capability outside graph and runtime
+input. The setting stays out of provider context and run/recovery history, and
+resume selects the caller's current executable again.</p>
 
 
 
@@ -1917,7 +1982,7 @@ installation conventions, resume behavior, and direct-target ownership boundary.
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-13">13 October 2026</time>
+    Last updated <time datetime="2026-10-15">15 October 2026</time>
   </span>
 
     
