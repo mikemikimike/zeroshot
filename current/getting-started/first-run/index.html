@@ -1842,7 +1842,8 @@ stream without stopping the controller; another terminal can read the durable st
 and select the run in <strong>Runs</strong>.</p>
 <p>Normal completion happens when the graph reaches a terminal node. An explicit
 <code>zeroshot force-stop RUN_ID</code> also closes the run, while engine or target failures can produce a
-terminal failure result.</p>
+terminal failure result. <code>zeroshot logs RUN_ID</code> keeps the error records that explain a failure,
+such as a failed node's error or the runtime cause.</p>
 <h2 id="try-the-smaller-template">Try the smaller template<a class="headerlink" href="#try-the-smaller-template" title="Permanent link">&para;</a></h2>
 <p><code>single-worker</code> has one agent node and no independent review loop:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="go">zeroshot template show single-worker</span>
