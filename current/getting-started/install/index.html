@@ -1869,8 +1869,9 @@ lists the automatic requirements and explains the separation.</p>
 the canonical <code>zeroshot-skill.md</code>, and <code>SHA256SUMS</code>; archive names contain the release version and
 target triple.</p>
 <p>The Python SDK requires Python 3.11 or newer and ships the matching executable inside each platform
-wheel:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="go">python -m pip install the-open-engine-zeroshot</span>
+wheel. Download the wheel for your <a href="../../guides/python-sdk/#install-and-run">OS and CPU</a> from <a href="https://github.com/the-open-engine/zeroshot/releases?q=zeroshot-python-v">Python SDK releases</a>.
+Replace <code>WHEEL_FILE</code> with its local path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="go">python -m pip install WHEEL_FILE</span>
 </code></pre></div>
 <p>For a long-running target, use <code>ghcr.io/the-open-engine/zeroshot-target</code>. See the
 <a href="../../concepts/targets/">targets guide</a> for a Docker setup bound to loopback.</p>

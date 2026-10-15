@@ -1789,7 +1789,10 @@
 targets. Each platform wheel contains the corresponding Zeroshot executable, which keeps the client
 and engine on one release line.</p>
 <h2 id="install-and-run">Install and run<a class="headerlink" href="#install-and-run" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="go">python -m pip install the-open-engine-zeroshot</span>
+<p>Download the wheel for your OS and CPU from <a href="https://github.com/the-open-engine/zeroshot/releases?q=zeroshot-python-v">Python SDK releases</a>.
+<code>x86_64</code> wheels target Intel/AMD CPUs; <code>arm64</code>/<code>aarch64</code> target ARM CPUs, including Apple silicon.
+Windows x64 uses <code>win_amd64</code>. Replace <code>WHEEL_FILE</code> with its local path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="go">python -m pip install WHEEL_FILE</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
