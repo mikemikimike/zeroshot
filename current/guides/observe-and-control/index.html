@@ -1513,6 +1513,8 @@
       
         
       
+        
+      
     
     
     
@@ -1601,6 +1603,34 @@
     
   
     Distribution contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../project/source-code-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source-code adapters
   
 
     
@@ -1867,9 +1897,9 @@ must be idle while they are restored.</p>
 storage and advertise <code>openengine.workspace-checkpoints/v1</code>. They retain that repository only for a
 failed recovery lineage and delete it after a successful run. Cloud exposes recovery through
 authenticated hosted run routes, so failed-run checkpoints remain available for 30 days after the
-original capsule is removed. Cloud resolves declared provider connections from their original
-references. It does not store a raw <code>GH_TOKEN</code>; export it again before resuming a named-target run
-that needs it for private source checkout or Git delivery.</p>
+original capsule is removed. Cloud resolves declared connections from their original references.
+Direct-target resume reuses the original source connection authorization and resolves fresh values;
+export <code>GH_TOKEN</code> again when the run uses it for checkout or GitHub delivery.</p>
 <h2 id="stop-only-with-explicit-intent">Stop only with explicit intent<a class="headerlink" href="#stop-only-with-explicit-intent" title="Permanent link">&para;</a></h2>
 <p><code>force-stop</code> is the destructive run-lifetime command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="go">zeroshot force-stop RUN_ID</span>
@@ -1898,7 +1928,7 @@ status first if another operator may already have stopped the run, or if it may 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-09-24">24 September 2026</time>
+    Last updated <time datetime="2026-10-15">15 October 2026</time>
   </span>
 
     

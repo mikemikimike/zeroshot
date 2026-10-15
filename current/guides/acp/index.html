@@ -1469,6 +1469,8 @@
       
         
       
+        
+      
     
     
     
@@ -1557,6 +1559,34 @@
     
   
     Distribution contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../project/source-code-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source-code adapters
   
 
     
@@ -1713,7 +1743,9 @@
 <h1 id="use-a-local-graph-as-an-acp-agent">Use a local graph as an ACP agent<a class="headerlink" href="#use-a-local-graph-as-an-acp-agent" title="Permanent link">&para;</a></h1>
 <p><code>zeroshot acp</code> is an experimental stdio endpoint that presents one saved local profile as an
 Agent Client Protocol (ACP) agent. Each ACP prompt runs the complete graph once, while the ACP
-session keeps the Git workspace and node provider sessions alive between prompts.</p>
+session keeps the working folder and node provider sessions alive between prompts. Plain folders
+are accepted; a folder inside a Git checkout resolves to its root. The working folder must be disjoint
+from the active Zeroshot state directory.</p>
 <h2 id="profile-contract">Profile contract<a class="headerlink" href="#profile-contract" title="Permanent link">&para;</a></h2>
 <p>The ACP preview accepts a deliberately narrow profile:</p>
 <ul>
@@ -1826,7 +1858,7 @@ it from the success node:</p>
 <a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="start-the-endpoint">Start the endpoint<a class="headerlink" href="#start-the-endpoint" title="Permanent link">&para;</a></h2>
-<p>Configure the ACP client to start this command in the canonical root of the Git worktree:</p>
+<p>Configure the ACP client to launch the saved profile:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="go">zeroshot acp --profile local:acp-worker</span>
 </code></pre></div>
 <p>The command checks that each lane's executable, <code>codex</code> or <code>claude</code>, is on <code>PATH</code>, as a local run
@@ -1889,7 +1921,7 @@ error and write the safe diagnostic to standard error.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-13">13 October 2026</time>
+    Last updated <time datetime="2026-10-15">15 October 2026</time>
   </span>
 
     

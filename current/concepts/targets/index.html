@@ -1497,6 +1497,8 @@
       
         
       
+        
+      
     
     
     
@@ -1585,6 +1587,34 @@
     
   
     Distribution contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../project/source-code-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source-code adapters
   
 
     
@@ -1770,10 +1800,20 @@
 <p>A target owns source preparation and the processes that execute graph nodes; it also stores durable
 run state and resolves connections. The graph protocol stays the same when the target changes.</p>
 <h2 id="local-controller">Local controller<a class="headerlink" href="#local-controller" title="Permanent link">&para;</a></h2>
-<p>Omit <code>--target</code> to work in the current Git worktree. Zeroshot starts a detached controller and keeps
-the run ledger under the local state directory, where later CLI invocations can list, watch, or stop
-the run.</p>
-<p>Local execution is the only mode that mutates the caller's existing worktree; each selected
+<p>Omit <code>--target</code> to work in an existing local folder. <code>--cwd FOLDER</code> selects the folder for one run;
+the default is the invoking folder. Input, graph, runtime, and environment file arguments remain
+relative to the invoking folder. A folder inside a Git checkout resolves to its canonical checkout
+root. Resume uses the original stored workspace.</p>
+<p>A run without Git delivery also accepts plain folders, remoteless repositories, detached checkouts,
+and unborn repositories. Zeroshot starts a detached controller and keeps the ledger under the local
+state directory, where later CLI invocations can list, watch, or stop the run. It does not initialize
+Git to run in a plain folder.</p>
+<p>The workspace and active Zeroshot state directory must be disjoint, including symlink aliases.
+If either contains the other, select another folder or set <code>ZEROSHOT_STATE_DIR</code> outside the workspace.
+Existing inactive state folders do not impose a separate admission rule. Disjoint workspaces can
+run concurrently. Aliases share one lease; a folder and its subtree cannot run at the same time. Reusing a submission key for
+another folder returns a conflict rather than a run from the first folder.</p>
+<p>Local execution is the only mode that mutates the caller's existing folder; each selected
 installed harness runs as the current user. A plan with
 <a href="../../reference/runtime-plan/#per-node-lanes">per-node lanes</a> needs every lane's CLI installed. The
 native <code>codex</code>/<code>openai</code>, <code>claude</code>/<code>anthropic</code>, and <code>copilot</code>/<code>github</code> lanes also need that CLI
@@ -1882,11 +1922,16 @@ use a proxy, set <code>--public-origin</code> to the exact browser origin.</p>
 <p>Keep the published port on loopback or a trusted private network. Put an authenticated reverse
 proxy with WebSocket forwarding in front of it before broader exposure.</p>
 </div>
-<p>Use <code>--target local-target</code> on run and observation commands to select it. Each named run selects
-its repository and branch from the invoking worktree's attached upstream. Without an upstream, the
-worktree must have exactly one GitHub remote. <code>--repository</code> and <code>--branch</code> override that selection,
-and <code>--revision</code> selects an exact commit instead of resolving the current remote branch tip.
-Detached worktrees require explicit repository and branch values.</p>
+<p>Use <code>--target local-target</code> on run and observation commands to select it. Docker and hosted targets
+require a Git source with an exact committed revision. <code>--cwd</code> selects the client checkout inspected
+for source selection; targets receive the remote revision, not that local folder or its uncommitted
+files. The attached upstream takes precedence; otherwise select the unique eligible HTTPS or SSH
+remote. Ambiguous remotes require an upstream or an explicit <code>--repository</code> selection.</p>
+<p><code>--repository</code> accepts a credential-free HTTPS/SSH clone URL or the existing GitHub <code>owner/name</code>
+shorthand. <code>--branch</code> overrides the branch, and <code>--revision</code> supplies an exact commit instead of
+resolving the remote branch tip. Detached worktrees require repository and branch overrides.
+Generic transport and credentials require a target advertising <code>openengine.git-transport/v1</code>;
+the CLI rejects an older target before submitting the request or acquiring an access token.</p>
 <h3 id="image-tags-and-remote-hosts">Image tags and remote hosts<a class="headerlink" href="#image-tags-and-remote-hosts" title="Permanent link">&para;</a></h3>
 <p>The image is published for <code>linux/amd64</code> only. Each release publishes a version tag such as
 <code>ghcr.io/the-open-engine/zeroshot-target:X.Y.Z</code> and a <code>sha-COMMIT</code> tag. <code>latest</code> moves to each newer
@@ -1912,11 +1957,23 @@ and capacity. Zeroshot's CLI and protocol do not prescribe those product policie
 should link to the version of these core docs that matches the deployed target, as described in
 <a href="../../project/versioning/">Documentation versions</a>.</p>
 <h2 id="source-and-delivery-credentials">Source and delivery credentials<a class="headerlink" href="#source-and-delivery-credentials" title="Permanent link">&para;</a></h2>
-<p>For named-target runs, the CLI can send <code>GH_TOKEN</code> for source checkout and generated GitHub delivery.
-A provider receives that value only if its runtime binding declares <code>GH_TOKEN</code>. After the target
-accepts a submission, the CLI reports the target, exact <code>owner/repository@branch#revision</code>, and
-whether the invoking worktree is dirty before emitting the run receipt. Uncommitted files remain
-local and are never committed or pushed automatically.</p>
+<p>Git checkout and push use shared HTTPS or SSH transport. A local push needs an attached, committed branch
+and an eligible remote; it uses the invoking user's native Git configuration and authentication when
+no source connection is selected. Push does not require GitHub or its CLI. PR and merge additionally
+require a registered forge adapter; GitHub is the maintained forge today. Other Git hosts can already
+use checkout and push.</p>
+<p><code>--source-connection KEY</code> selects private transport authority without granting it to agent nodes.
+HTTPS connections declare <code>GIT_USERNAME</code> and <code>GIT_PASSWORD</code>; SSH connections declare
+<code>GIT_SSH_PRIVATE_KEY</code> and <code>GIT_SSH_KNOWN_HOSTS</code>. Explicit SSH authentication uses those pinned hosts
+and its private key. Contained runs inherit no host Git login state.</p>
+<p>Named GitHub runs retain <code>GH_TOKEN</code> checkout and delivery support. That token is not automatically
+applied to another Git host. A model provider receives a connection field only when its own runtime
+binding declares it. Transport values stay out of source records, ledgers, observations, and
+checkpoint snapshots. Direct-target resume reuses the original source connection authorization and
+resolves fresh values.</p>
+<p>After admission, the CLI reports the target, repository, branch, exact revision, and whether the
+client checkout is dirty before emitting the receipt. Uncommitted files stay on the client.
+See <a href="../../project/source-code-adapters/">Source-code adapters</a> for the contribution boundary.</p>
 
 
 
@@ -1937,7 +1994,7 @@ local and are never committed or pushed automatically.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-13">13 October 2026</time>
+    Last updated <time datetime="2026-10-15">15 October 2026</time>
   </span>
 
     
