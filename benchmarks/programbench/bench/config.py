@@ -12,6 +12,9 @@ from typing import Any
 from . import ROOT
 
 ARMS = ("loop", "single")
+# The checker's provider session: a fresh one for every execution, or one kept across the loop's rounds
+# (as the builder's always is), so the checker remembers what it rejected and the fixes it asked for.
+CHECK_SESSION_SCOPES = ("execution", "node_instance")
 # Instructions for the build node (prompts/<name>.md). builder-checker runs the loop's two roles in
 # one session (the builder's and checker's prompts verbatim); only a single arm may use it.
 BUILD_PROMPTS = ("builder", "builder-checker")
@@ -110,6 +113,12 @@ class Experiment:
         return self.raw["arms"]["loop"]["max_iterations"]
 
     @property
+    def check_session_scope(self) -> str:
+        """``execution`` (a fresh checker session every round) or ``node_instance`` (one session kept
+        across the loop's rounds); the runtime plan's ``sessionScope`` for the check node."""
+        return self.raw["arms"].get("loop", {}).get("check_session_scope", "execution")
+
+    @property
     def pricing(self) -> dict[str, Any]:
         return self.raw["pricing"]
 
@@ -189,6 +198,10 @@ def _validate(raw: dict[str, Any]) -> None:
         raise ValueError(f"prompts.build must be one of {BUILD_PROMPTS}, and only a single-arm experiment may change it")
     if set(arms) - set(ARMS):
         raise ValueError(f"unknown arms: {set(arms) - set(ARMS)}")
+    if "loop" in arms and (set(arms["loop"]) - {"repeats", "max_iterations", "check_session_scope"} or arms["loop"].get("check_session_scope", "execution") not in CHECK_SESSION_SCOPES):
+        raise ValueError(f"arms.loop takes repeats, max_iterations and check_session_scope (one of {CHECK_SESSION_SCOPES})")
+    if "single" in arms and set(arms["single"]) != {"repeats"}:
+        raise ValueError("arms.single takes repeats only")
     order = raw["order"]
     for arm in ARMS:
         if arm in arms and order.count(arm) != arms[arm]["repeats"]:

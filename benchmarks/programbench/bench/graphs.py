@@ -147,9 +147,10 @@ def loop_graph(builder: str, checker: str, max_iterations: int, build_timeout_ms
     )
 
 
-def runtime_plan(arm: str, model: str, effort: str) -> dict[str, Any]:
-    """Exact runtime plan. The builder resumes its own session across rounds; each check is fresh."""
+def runtime_plan(arm: str, model: str, effort: str, check_session_scope: str = "execution") -> dict[str, Any]:
+    """Exact runtime plan. The builder resumes its own session across rounds; each check is fresh unless
+    ``check_session_scope`` is ``node_instance``, which keeps one checker session across the rounds."""
     nodes = {"build": {"kind": "agent", "model": model, "effort": effort, "sessionScope": "node_instance"}}
     if arm == "loop":
-        nodes["check"] = {"kind": "agent", "model": model, "effort": effort, "sessionScope": "execution"}
+        nodes["check"] = {"kind": "agent", "model": model, "effort": effort, "sessionScope": check_session_scope}
     return {"harness": HARNESS, "provider": PROVIDER, "size": "medium", "nodes": nodes}

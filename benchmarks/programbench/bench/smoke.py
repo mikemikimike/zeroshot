@@ -319,11 +319,13 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
         {k: {"cost": a["cost_usd"], "sessions": [(s["node"], s["rounds"]) for s in a["tokens"]["sessions"]], "ledger_input": (a["tokens"]["ledger_total"] or {}).get("inputTokens"), "transcript_input": a["tokens"]["nodes"].get("total", {}).get("inputTokens")} for k, a in attempts.items()}))
 
     def transcripts_match_ledger() -> tuple[bool, Any]:
-        """Fresh threads (every check; the single arm's build) must agree exactly with the ledger.
-        The ledger over-counts a resumed builder thread, and records nothing for an execution that
-        was interrupted (timeout, force-stop), so only nodes whose executions all ended normally
-        are compared."""
+        """Fresh threads (every check of a fresh-session checker; the single arm's build) must agree
+        exactly with the ledger. The ledger over-counts a resumed thread (the builder's, and the
+        checker's when its session is kept), and records nothing for an execution that was
+        interrupted (timeout, force-stop), so only nodes whose executions all ended normally are
+        compared."""
         detail: dict[str, Any] = {}
+        fresh_checks = smoke.exp.check_session_scope == "execution"
         for a in attempts.values():
             ledger_nodes, nodes = a["tokens"].get("ledger_nodes") or {}, a["tokens"]["nodes"]
             # A force-stop interrupts one execution: the checks are still comparable when every
@@ -333,7 +335,7 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
                 "check": all(v in ("accepted", "rejected") for v in a["verdicts"]) and check_sessions == len(a["verdicts"]),
                 "build": all(b == "verified" for b in a["build_outcomes"]) and not a.get("force_stopped"),
             }
-            for node in ["check"] + (["build"] if a["arm"] == "single" else []):
+            for node in (["check"] if fresh_checks else []) + (["build"] if a["arm"] == "single" else []):
                 if node not in ledger_nodes and node not in nodes:
                     continue
                 if not ended_normally[node]:
@@ -343,7 +345,9 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
                 same = ledger_usage == transcript_usage
                 detail[f"{a['label']}.{node}"] = "match" if same else {"ledger": ledger_usage, "transcripts": transcript_usage}
         compared = [v for v in detail.values() if not str(v).startswith("skipped")]
-        return bool(compared) and all(v == "match" for v in compared), detail
+        if not compared:  # a kept checker session leaves no fresh thread to compare in a loop-only smoke
+            return not fresh_checks, detail or "no fresh-session node to compare"
+        return all(v == "match" for v in compared), detail
 
     smoke.check("pipeline_transcripts_match_ledger", transcripts_match_ledger)
     smoke.check("pipeline_no_secret_in_artifacts", lambda: (summary["secrets"]["checked_literal_key"] and not summary["secrets"]["literal_key_hits"], summary["secrets"]))

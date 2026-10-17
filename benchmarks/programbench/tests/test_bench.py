@@ -107,6 +107,9 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(plan["nodes"]["build"]["sessionScope"], "node_instance")
         self.assertEqual(plan["nodes"]["check"]["sessionScope"], "execution")
         self.assertEqual(set(graphs.runtime_plan("single", "m", "xhigh")["nodes"]), {"build"})
+        kept = graphs.runtime_plan("loop", "m", "xhigh", "node_instance")
+        self.assertEqual(kept["nodes"]["check"]["sessionScope"], "node_instance")
+        self.assertEqual({**kept, "nodes": None}, {**plan, "nodes": None})
 
     def test_task_statement_is_upstream_minus_scaffold(self):
         task = config.prompt("task")
@@ -234,6 +237,31 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual((smoke.model, set(smoke.raw)), ("gpt-5.6-luna", EXPERIMENT_KEYS))
         sol_smoke = config.load("experiments/smoke-svgbob-sol.json")
         self.assertEqual((sol_smoke.model, sol_smoke.raw["task"], sol_smoke.raw["pricing"]), ("gpt-5.6-sol", EXPERIMENT.raw["task"], reference_sol.raw["pricing"]))
+
+    def test_the_checker_session_study_changes_only_the_checker_session(self):
+        paths = sorted(ROOT.glob("experiments/luna-xhigh-*-checker-resumed.json"))
+        self.assertEqual(len(paths), 20)
+        for path in paths:
+            exp = config.load(path)
+            loop = config.load(f"experiments/{exp.id.removesuffix('-checker-resumed')}-v1.json")
+            self.assertEqual((exp.check_session_scope, loop.check_session_scope), ("node_instance", "execution"))
+            self.assertEqual(set(exp.raw), EXPERIMENT_KEYS)
+            for key in ("task", "model", "order", "limits", "resources", "eval", "pricing"):
+                self.assertEqual(exp.raw[key], loop.raw[key], key)
+            self.assertEqual(exp.raw["arms"], {"loop": {**loop.raw["arms"]["loop"], "check_session_scope": "node_instance"}})
+            ours, theirs = run_files(exp, "loop"), run_files(loop, "loop")
+            self.assertEqual((ours["graph.json"], ours["input.json"]), (theirs["graph.json"], theirs["input.json"]))  # the same graph, the same input
+            self.assertEqual(ours["runtime.json"]["nodes"]["check"]["sessionScope"], "node_instance")
+            self.assertEqual(ours["runtime.json"]["nodes"]["build"], theirs["runtime.json"]["nodes"]["build"])
+            self.assertEqual({**ours["runtime.json"], "nodes": None}, {**theirs["runtime.json"], "nodes": None})
+            self.assertIn(loop.id, exp.raw["description"])
+        smoke, plain = config.load("experiments/smoke-svgbob-checker-resumed.json"), config.load("experiments/smoke-svgbob.json")
+        self.assertEqual(smoke.check_session_scope, "node_instance")
+        self.assertEqual({k: v for k, v in smoke.raw.items() if k not in ("id", "description", "arms")}, {k: v for k, v in plain.raw.items() if k not in ("id", "description", "arms")})
+        raw = EXPERIMENT.raw
+        for bad in ({**raw, "arms": {"loop": {**raw["arms"]["loop"], "check_session_scope": "fresh"}}}, {**raw, "arms": {"loop": {**raw["arms"]["loop"], "resume_checker": True}}}):
+            with self.assertRaises(ValueError, msg=bad):
+                self._load(bad)
 
     def test_keifu_runs_codex_under_the_reaper(self):
         # keifu is a terminal UI: its agents drive it through pseudo-terminals and tmux, which leave

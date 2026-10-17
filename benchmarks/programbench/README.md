@@ -15,6 +15,9 @@ independent checker whose rejection becomes the builder's feedback for the next 
 2. **Prompt study.** Is the loop's benefit the topology, or would the same instructions in one session
    do as well? GPT-5.6 Luna runs once per attempt with a prompt that quotes both roles and asks the
    model to alternate between them.
+3. **Checker session.** Does the loop need a checker that starts fresh every round? The same loop runs
+   with a checker that keeps its session across rounds, so it remembers what it rejected and the fixes
+   it asked for.
 
 Twenty tasks, 5 runs per arm per task. Every task is reported; there is no pooled test across tasks.
 
@@ -118,10 +121,12 @@ Each task has three experiment files and a smoke test (`experiments/`):
 | `luna-xhigh-<task>-v1.json` | loop, up to 50 rounds | 5 | GPT-5.6 Luna, xhigh |
 | `sol-xhigh-<task>-single.json` | single worker (the build node alone) | 5 | GPT-5.6 Sol, xhigh |
 | `luna-xhigh-<task>-prompt.json` | single session with `prompts/builder-checker.md`, 6-hour node limit | 5 | GPT-5.6 Luna, xhigh |
+| `luna-xhigh-<task>-checker-resumed.json` | loop, up to 50 rounds, the checker keeps its session across rounds | 5 | GPT-5.6 Luna, xhigh |
 | `smoke-<task>.json` | one 3-round loop with short limits | 1 | GPT-5.6 Luna, xhigh |
 
-`smoke-svgbob-sol.json` is the same smoke test with Sol and longer node limits. All 20 tasks share
-one protocol: the same
+`smoke-svgbob-sol.json` is the same smoke test with Sol and longer node limits;
+`smoke-svgbob-checker-resumed.json` is the smoke test with the checker's session kept. All 20 tasks
+share one protocol: the same
 prompts, graphs, limits (6 hours per run, 3 hours per build, 1 hour per check), resources (5 runs
 at once, 4 CPUs and 7 GB each), evaluation settings and prices. The experiment file declares one
 general adjustment to every task, applied by `agent/prepare-task.py` when the agent image is built
@@ -137,6 +142,11 @@ pseudo-terminals and tmux, which leave orphaned processes behind.
 
 Loop runs are scored at build 1 and in the final workspace (`eval.rounds`); every round's snapshot is
 archived, and the comparisons score the snapshots they need.
+
+The checker-session experiments are the loop experiments with one change in the runtime plan: the
+check node's `sessionScope` is `node_instance` instead of `execution` (`arms.loop.check_session_scope`),
+so the checker resumes its own session every round, as the builder does, instead of starting fresh.
+The graph, the prompts, the input and every limit are byte-identical to the loop's.
 
 ## Comparisons
 
@@ -157,6 +167,13 @@ the loop runs gets there. Builds are scored in blocks until the search settles.
 **Prompt study.** The same two comparisons with the 5 prompted sessions in place of Sol's single
 workers: P is the sessions' mean model cost at Luna's prices; the loop is compared at P (equal cost)
 and by its cost to reach the sessions' mean score (equal score).
+
+**Checker session.** Both loops are compared through the same Sol single workers: the loop with a
+kept checker session gets its own `bench parity` and `bench match` against `sol-xhigh-<task>-single`,
+and per task its score at Sol's mean cost, its cost to reach Sol's mean score and its final score are
+set against the fresh-checker loop's, each difference with a 95% bootstrap interval as above.
+Reported alongside: the model cost of a check round, the rounds within Sol's budget, and how often the
+checker accepted.
 
 A run enters a comparison only if it completed, its compared workspace was scored on all tests (a
 workspace that fails to compile or to produce a usable executable scores 0, as on the leaderboard;
@@ -286,6 +303,10 @@ Per-task results: `figures/prompt-study/<loop>.json` (from `bench parity`) and `
 draws the three arms side by side at Sol's budget, each arm's repeatability (the spread of a run's
 score around its task's mean) and score and repeatability against model cost.
 
+### Checker session
+
+Not run yet. The experiments and the comparison are defined above; the commands are under Reproduce.
+
 ## Reproduce
 
 Requirements: Linux x86_64, rootful Docker 26 or newer, Python 3.12 for the unit tests, and an
@@ -311,7 +332,8 @@ test containers).
    isolation from inside a real run, runs the whole pipeline with short limits, and re-scores a
    published leaderboard submission on the task, which must agree with the leaderboard within 2
    points. On crowbook, dust, tree-sitter and samtools that last check fails by design (see Scoring
-   and cost); every other check must pass.
+   and cost); every other check must pass. `smoke-svgbob-checker-resumed.json` is the smoke test for
+   the checker-session experiments.
 
    ```bash
    scripts/zsbench smoke experiments/smoke-svgbob.json
@@ -326,6 +348,7 @@ test containers).
    scripts/zsbench run experiments/luna-xhigh-svgbob-v1.json
    scripts/zsbench run experiments/sol-xhigh-svgbob-single.json
    scripts/zsbench run experiments/luna-xhigh-svgbob-prompt.json
+   scripts/zsbench run experiments/luna-xhigh-svgbob-checker-resumed.json   # the checker-session study
    ```
 
 4. Compare. `parity` scores the loop's parity workspaces and writes
@@ -337,6 +360,8 @@ test containers).
    scripts/zsbench match experiments/luna-xhigh-svgbob-v1.json --against experiments/sol-xhigh-svgbob-single.json
    scripts/zsbench parity experiments/luna-xhigh-svgbob-v1.json --against experiments/luna-xhigh-svgbob-prompt.json
    scripts/zsbench match experiments/luna-xhigh-svgbob-v1.json --against experiments/luna-xhigh-svgbob-prompt.json
+   scripts/zsbench parity experiments/luna-xhigh-svgbob-checker-resumed.json --against experiments/sol-xhigh-svgbob-single.json
+   scripts/zsbench match experiments/luna-xhigh-svgbob-checker-resumed.json --against experiments/sol-xhigh-svgbob-single.json
    ```
 
 5. Repeat steps 2 to 4 for the other 19 tasks. On a large host, experiments can run side by side:
