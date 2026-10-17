@@ -976,6 +976,9 @@ class EvalTests(unittest.TestCase):
         late = {**crash, "output": header + crash["output"]}
         self.assertFalse(evaluate.missing_results_explained({"log": [install, late, missing]}))
         self.assertEqual(evaluate.infrastructure_error({**scored, "missing_results_explained": False}), "test branch errors ['b']")
+        # A score from an evaluation that predates missing_results_explained keeps the timed-out rule.
+        self.assertIsNone(evaluate.infrastructure_error({"score": 0.0, "test_branch_errors": errors, "test_runs_timed_out": True}))
+        self.assertEqual(evaluate.infrastructure_error({"score": 0.0, "test_branch_errors": errors, "test_runs_timed_out": False}), "test branch errors ['b']")
 
     def test_targets_skip_discarded_attempts(self):
         from bench import evaluate

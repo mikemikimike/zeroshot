@@ -38,7 +38,9 @@ SUBMISSION_OUTCOMES = frozenset({"compile_failed", "copy_executable_failed", "ha
 def infrastructure_error(score: dict[str, Any]) -> str | None:
     """Why an archive's evaluation cannot be trusted, or None."""
     branch_errors = score.get("test_branch_errors") or {}
-    explained = score.get("missing_results_explained")
+    # Scores carry missing_results_explained; those of an evaluation that predates it carry only the
+    # narrower test_runs_timed_out, which keeps the same meaning for a timed-out branch.
+    explained = score.get("missing_results_explained", score.get("test_runs_timed_out"))
     no_results = explained and all({_error_code(e) for e in errors} == {"results_read_failed"} for errors in branch_errors.values())
     if branch_errors and not no_results:
         return f"test branch errors {sorted(branch_errors)}"
