@@ -1,168 +1,163 @@
 name: Zeroshot issue audit
 description: >-
-  Audits GitHub issues with Claude Code or Codex, then labels each one ready for implementation or
-  asks the reporter a few focused questions.
+  Audit GitHub issues for implementation readiness with Claude Code or Codex, then label the issue
+  and ask the reporter focused questions with suggested defaults.
 author: The Open Engine Company
 
 inputs:
+  github-token:
+    description: Token for the deterministic decide and publish steps. Never reaches the agent.
+    default: ${{ github.token }}
   harness:
-    description: Coding agent that performs the audit, claude or codex.
-    default: claude
+    description: Agent harness, `claude-code` or `codex`.
+    default: claude-code
   model:
-    description: Optional model passed unchanged to the harness.
+    description: Optional model identifier, passed to the harness unchanged.
     default: ''
   claude-code-oauth-token:
-    description: Claude Code OAuth token (from `claude setup-token`), for harness claude.
+    description: Claude Code OAuth token. Use this or `anthropic-api-key` with `claude-code`.
     default: ''
   anthropic-api-key:
-    description: Anthropic API key, for harness claude when no OAuth token is set.
+    description: Anthropic API key. Use this or `claude-code-oauth-token` with `claude-code`.
     default: ''
   openai-api-key:
-    description: OpenAI API key, for harness codex.
+    description: OpenAI API key, required with `codex`.
     default: ''
-  trigger:
-    description: >-
-      Which issues are audited. trusted audits issues opened by authors with min-permission;
-      label waits for a maintainer to apply audit-label; trusted-or-label does both.
-    default: trusted-or-label
-  min-permission:
-    description: Repository role required of trusted authors and command senders.
+  claude-code-version:
+    description: Exact `@anthropic-ai/claude-code` version.
+    default: 2.1.276
+  codex-version:
+    description: Exact `@openai/codex` version.
+    default: 0.155.0
+  trigger-mode:
+    description: '`trusted-authors`, `label` or `both`.'
+    default: both
+  minimum-author-role:
+    description: Minimum repository role of an author whose new issue is audited automatically.
+    default: write
+  maintainer-role:
+    description: Minimum repository role to apply the audit label or use the audit command.
     default: write
   audit-label:
-    description: Label a maintainer applies to accept an issue for auditing.
+    description: Label a maintainer applies to request an audit.
     default: audit
   ready-label:
     description: Label applied when the issue is ready for implementation.
-    default: ready
-  needs-info-label:
-    description: Label applied while the audit is waiting for answers.
-    default: needs-info
+    default: ready-for-implementation
+  needs-information-label:
+    description: Label applied while the issue awaits answers from its author.
+    default: needs-information
   command:
-    description: Comment command that lets a maintainer request a new audit.
+    description: Maintainer comment command that requests a new audit, even after the round cap.
     default: /audit
   max-rounds:
-    description: Automatic follow-up rounds before only a maintainer can restart the audit.
+    description: Maximum automatic audit rounds before a maintainer must restart.
     default: '3'
   max-questions:
-    description: Questions asked per round.
+    description: Maximum questions per needs-information verdict.
     default: '3'
-  max-budget-usd:
-    description: Spending limit per audit in USD, enforced by Claude Code.
-    default: '1'
   timeout-minutes:
-    description: Time limit for the agent in minutes.
+    description: Wall-clock limit for the agent.
     default: '10'
-  checkout:
-    description: Check out the repository read-only before the audit. Set false if already done.
-    default: 'true'
-  github-token:
-    description: Token used to read the issue, label it and comment. Never given to the agent.
-    default: ${{ github.token }}
-  claude-code-version:
-    description: '@anthropic-ai/claude-code version.'
-    default: 2.1.276
-  codex-version:
-    description: '@openai/codex version.'
-    default: 0.155.0
+  max-turns:
+    description: Maximum Claude Code agent turns.
+    default: '30'
+  max-budget-usd:
+    description: Maximum Claude Code spend per audit in US dollars.
+    default: '1'
 
 outputs:
-  ran:
-    description: Whether this event produced an audit.
-    value: ${{ steps.gate.outputs.run }}
+  audited:
+    description: '`true` when the event started an audit.'
+    value: ${{ steps.decide.outputs.audit }}
+  reason:
+    description: Why the event did or did not start an audit.
+    value: ${{ steps.decide.outputs.reason }}
+  round:
+    description: Audit round number, or `0` without an audit.
+    value: ${{ steps.decide.outputs.round }}
+  verdict:
+    description: '`ready` or `needs-information` after a published audit.'
+    value: ${{ steps.publish.outputs.verdict }}
 
 runs:
   using: composite
   steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      with:
+        node-version: 22
+
     - name: Decide whether to audit
-      id: gate
+      id: decide
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        AUDIT_TRIGGER: ${{ inputs.trigger }}
-        AUDIT_MIN_PERMISSION: ${{ inputs.min-permission }}
-        AUDIT_LABEL: ${{ inputs.audit-label }}
-        AUDIT_READY_LABEL: ${{ inputs.ready-label }}
-        AUDIT_NEEDS_INFO_LABEL: ${{ inputs.needs-info-label }}
-        AUDIT_COMMAND: ${{ inputs.command }}
-        AUDIT_MAX_ROUNDS: ${{ inputs.max-rounds }}
-        AUDIT_MAX_QUESTIONS: ${{ inputs.max-questions }}
-      run: node "$GITHUB_ACTION_PATH/gate.js"
+        ISSUE_AUDIT_WORKDIR: ${{ runner.temp }}/zeroshot-issue-audit
+        ISSUE_AUDIT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        ISSUE_AUDIT_HARNESS: ${{ inputs.harness }}
+        ISSUE_AUDIT_MODEL: ${{ inputs.model }}
+        ISSUE_AUDIT_CLAUDE_CODE_VERSION: ${{ inputs.claude-code-version }}
+        ISSUE_AUDIT_CODEX_VERSION: ${{ inputs.codex-version }}
+        ISSUE_AUDIT_TRIGGER_MODE: ${{ inputs.trigger-mode }}
+        ISSUE_AUDIT_MINIMUM_AUTHOR_ROLE: ${{ inputs.minimum-author-role }}
+        ISSUE_AUDIT_MAINTAINER_ROLE: ${{ inputs.maintainer-role }}
+        ISSUE_AUDIT_AUDIT_LABEL: ${{ inputs.audit-label }}
+        ISSUE_AUDIT_READY_LABEL: ${{ inputs.ready-label }}
+        ISSUE_AUDIT_NEEDS_INFORMATION_LABEL: ${{ inputs.needs-information-label }}
+        ISSUE_AUDIT_COMMAND: ${{ inputs.command }}
+        ISSUE_AUDIT_MAX_ROUNDS: ${{ inputs.max-rounds }}
+        ISSUE_AUDIT_MAX_QUESTIONS: ${{ inputs.max-questions }}
+        ISSUE_AUDIT_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+        ISSUE_AUDIT_MAX_TURNS: ${{ inputs.max-turns }}
+        ISSUE_AUDIT_MAX_BUDGET_USD: ${{ inputs.max-budget-usd }}
+      run: |
+        set -euo pipefail
+        rm -rf -- "$ISSUE_AUDIT_WORKDIR"
+        install -d -m 0700 -- "$ISSUE_AUDIT_WORKDIR"
+        node "$GITHUB_ACTION_PATH/decide.js"
 
-    - name: Check out repository
-      if: steps.gate.outputs.run == 'true' && inputs.checkout == 'true'
+    - name: Check out repository without credentials
+      if: ${{ steps.decide.outputs.audit == 'true' }}
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
+        path: .zeroshot-issue-audit/repository
         persist-credentials: false
-
-    - name: Prepare audit
-      if: steps.gate.outputs.run == 'true'
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        AUDIT_HARNESS: ${{ inputs.harness }}
-        AUDIT_HAS_CLAUDE_AUTH: ${{ inputs.claude-code-oauth-token != '' || inputs.anthropic-api-key != '' }}
-        AUDIT_HAS_CODEX_AUTH: ${{ inputs.openai-api-key != '' }}
-        AUDIT_TRIGGER: ${{ inputs.trigger }}
-        AUDIT_MIN_PERMISSION: ${{ inputs.min-permission }}
-        AUDIT_LABEL: ${{ inputs.audit-label }}
-        AUDIT_READY_LABEL: ${{ inputs.ready-label }}
-        AUDIT_NEEDS_INFO_LABEL: ${{ inputs.needs-info-label }}
-        AUDIT_COMMAND: ${{ inputs.command }}
-        AUDIT_MAX_ROUNDS: ${{ inputs.max-rounds }}
-        AUDIT_MAX_QUESTIONS: ${{ inputs.max-questions }}
-        AUDIT_ROUND: ${{ steps.gate.outputs.round }}
-      run: |
-        set -euo pipefail
-        case "$AUDIT_HARNESS" in
-          claude) [ "$AUDIT_HAS_CLAUDE_AUTH" = true ] || { echo "::error::harness claude needs claude-code-oauth-token or anthropic-api-key"; exit 1; } ;;
-          codex) [ "$AUDIT_HAS_CODEX_AUTH" = true ] || { echo "::error::harness codex needs openai-api-key"; exit 1; } ;;
-          *) echo "::error::harness must be claude or codex"; exit 1 ;;
-        esac
-        work="$RUNNER_TEMP/issue-audit"
-        rm -rf "$work"
-        install -d -m 700 "$work"
-        AUDIT_PROMPT_FILE="$work/prompt.md" node "$GITHUB_ACTION_PATH/context.js"
+        fetch-depth: 1
 
     - name: Install harness
-      if: steps.gate.outputs.run == 'true'
+      if: ${{ steps.decide.outputs.audit == 'true' }}
       shell: bash
       env:
-        AUDIT_HARNESS: ${{ inputs.harness }}
-        CLAUDE_CODE_VERSION: ${{ inputs.claude-code-version }}
-        CODEX_VERSION: ${{ inputs.codex-version }}
+        ISSUE_AUDIT_WORKDIR: ${{ runner.temp }}/zeroshot-issue-audit
+      run: node "$GITHUB_ACTION_PATH/install.js"
+
+    - name: Run read-only audit agent
+      if: ${{ steps.decide.outputs.audit == 'true' }}
+      shell: bash
+      env:
+        ISSUE_AUDIT_WORKDIR: ${{ runner.temp }}/zeroshot-issue-audit
+        ISSUE_AUDIT_CHECKOUT: ${{ github.workspace }}/.zeroshot-issue-audit/repository
+        ISSUE_AUDIT_CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        ISSUE_AUDIT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        ISSUE_AUDIT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
       run: |
         set -euo pipefail
-        if [ "$AUDIT_HARNESS" = claude ]; then package="@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
-        else package="@openai/codex@$CODEX_VERSION"; fi
-        npm install --global --prefix "$RUNNER_TEMP/issue-audit/harness" --no-audit --no-fund "$package"
+        chmod -R a-w -- "$ISSUE_AUDIT_CHECKOUT"
+        node "$GITHUB_ACTION_PATH/audit.js"
 
-    - name: Run audit agent
-      if: steps.gate.outputs.run == 'true'
+    - name: Restore checkout permissions
+      if: ${{ always() && steps.decide.outputs.audit == 'true' }}
       shell: bash
       env:
-        AUDIT_HARNESS: ${{ inputs.harness }}
-        AUDIT_MODEL: ${{ inputs.model }}
-        AUDIT_BUDGET: ${{ inputs.max-budget-usd }}
-        AUDIT_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
-        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
-        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-      run: bash "$GITHUB_ACTION_PATH/run-agent.sh"
+        ISSUE_AUDIT_CHECKOUT: ${{ github.workspace }}/.zeroshot-issue-audit/repository
+      run: |
+        if [[ -d "$ISSUE_AUDIT_CHECKOUT" ]]; then chmod -R u+w -- "$ISSUE_AUDIT_CHECKOUT"; fi
 
     - name: Publish verdict
-      if: steps.gate.outputs.run == 'true'
+      id: publish
+      if: ${{ steps.decide.outputs.audit == 'true' }}
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        AUDIT_HARNESS: ${{ inputs.harness }}
-        AUDIT_RESULT_FILE: ${{ runner.temp }}/issue-audit/result.json
-        AUDIT_ROUND: ${{ steps.gate.outputs.round }}
-        AUDIT_TRIGGER: ${{ inputs.trigger }}
-        AUDIT_MIN_PERMISSION: ${{ inputs.min-permission }}
-        AUDIT_LABEL: ${{ inputs.audit-label }}
-        AUDIT_READY_LABEL: ${{ inputs.ready-label }}
-        AUDIT_NEEDS_INFO_LABEL: ${{ inputs.needs-info-label }}
-        AUDIT_COMMAND: ${{ inputs.command }}
-        AUDIT_MAX_ROUNDS: ${{ inputs.max-rounds }}
-        AUDIT_MAX_QUESTIONS: ${{ inputs.max-questions }}
+        ISSUE_AUDIT_WORKDIR: ${{ runner.temp }}/zeroshot-issue-audit
+        ISSUE_AUDIT_GITHUB_TOKEN: ${{ inputs.github-token }}
       run: node "$GITHUB_ACTION_PATH/publish.js"

@@ -1,8 +1,10 @@
-name: Issue audit
+name: Issue Audit
 
+# Disabled until the repository variable ZEROSHOT_ISSUE_AUDIT_ENABLED is set to `true`.
+# The model credential comes from the ZEROSHOT_ISSUE_AUDIT_CLAUDE_CODE_OAUTH_TOKEN secret.
 on:
   issues:
-    types: [opened, reopened, edited, labeled]
+    types: [opened, edited, labeled]
   issue_comment:
     types: [created]
 
@@ -10,27 +12,29 @@ permissions: {}
 
 concurrency:
   group: issue-audit-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   audit:
     name: audit
-    # Opt in with the ISSUE_AUDIT_ENABLED repository variable once the token secret exists.
     if: >-
-      ${{ vars.ISSUE_AUDIT_ENABLED == 'true' && !github.event.issue.pull_request &&
-      github.event.sender.type != 'Bot' }}
+      vars.ZEROSHOT_ISSUE_AUDIT_ENABLED == 'true' &&
+      github.event.issue.pull_request == null &&
+      github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Checkout default branch
+      - name: Check out the issue audit action
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          sparse-checkout: .github/actions/issue-audit
 
       - name: Audit issue
         uses: ./.github/actions/issue-audit
         with:
-          checkout: 'false'
-          claude-code-oauth-token: ${{ secrets.ISSUE_AUDIT_CLAUDE_CODE_OAUTH_TOKEN }}
+          harness: claude-code
+          claude-code-oauth-token: ${{ secrets.ZEROSHOT_ISSUE_AUDIT_CLAUDE_CODE_OAUTH_TOKEN }}

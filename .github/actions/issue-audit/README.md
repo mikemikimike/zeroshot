@@ -1,22 +1,39 @@
-# Issue audit
+# Zeroshot issue audit action
 
-A GitHub Action that checks whether new issues are ready for implementation. A coding agent (Claude
-Code or Codex, on your own credentials) reads the issue and the repository. It then either labels the
-issue `ready` or labels it `needs-info` and asks the reporter a few focused questions, each with a
-suggested default. When the reporter answers, the issue is audited again.
+A reusable GitHub Action that checks whether a new issue is ready for implementation. A coding agent
+(Claude Code or Codex) reads the issue and the repository, then the action either labels the issue
+ready or labels it as needing information and asks the reporter a few focused questions. Each
+question has a suggested default the reporter can accept. When the reporter answers, the issue is
+audited again.
 
-It applies the same task-shaping rules as the Zeroshot operator skill: observable success, material
-constraints, verifiability, and only questions that change the outcome. It runs no Zeroshot graph and
-needs no Zeroshot installation.
+Adopting it does not require installing Zeroshot or running a Zeroshot graph. You only need a short
+workflow and your own model credential.
 
-## Usage
+## Audit criteria
+
+The audit uses the task-shaping rules of the Zeroshot operator skill
+([`npm/zeroshot/skills/zeroshot/SKILL.md`](../../../npm/zeroshot/skills/zeroshot/SKILL.md), "Shape
+the task"). An issue is ready when a separate worker could implement it and an independent verifier
+could judge the result:
+
+- the desired behavior and observable success are clear;
+- material constraints and behavior that must remain unchanged are known;
+- the scope is one useful outcome.
+
+The agent fills gaps from repository evidence and asks only about choices that would materially
+change the outcome. It never asks for approval, priorities or timelines.
+
+## Adopt
+
+Add `.github/workflows/issue-audit.yml` to your repository and store the model credential as a
+repository secret:
 
 ```yaml
-name: Issue audit
+name: Issue Audit
 
 on:
   issues:
-    types: [opened, reopened, edited, labeled]
+    types: [opened, edited, labeled]
   issue_comment:
     types: [created]
 
@@ -24,6 +41,7 @@ permissions: {}
 
 concurrency:
   group: issue-audit-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   audit:
@@ -34,50 +52,107 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: the-open-engine/zeroshot/.github/actions/issue-audit@main
+      - uses: the-open-engine/zeroshot/.github/actions/issue-audit@<commit-sha>
         with:
+          harness: claude-code
           claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
-Pin `@main` to a commit SHA for reproducible behavior. For Codex, set `harness: codex` and
-`openai-api-key`. Create a Claude Code OAuth token with `claude setup-token`, or pass
-`anthropic-api-key` instead.
+Pin the action to a full commit SHA. For Codex, use `harness: codex` with
+`openai-api-key: ${{ secrets.OPENAI_API_KEY }}`. For the Anthropic API, use
+`anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}` instead of the OAuth token.
 
-## Which issues are audited
+The action checks out the repository's default branch into `.zeroshot-issue-audit/repository`
+inside the workspace, so no checkout step is needed. It sets up Node.js 22 for its own scripts. Labels that do not exist yet are created when
+first applied.
 
-Every event is checked before any credential is used or any model is called. Skipped events cost a
-few API reads.
-
-| `trigger`                    | Audited automatically                                   | Otherwise                                |
-| ---------------------------- | ------------------------------------------------------- | ---------------------------------------- |
-| `trusted`                    | Issues opened by authors with at least `min-permission` | Never                                    |
-| `label`                      | Issues where someone with Triage access applied `audit` | Never                                    |
-| `trusted-or-label` (default) | Issues from trusted authors                             | Waits until a maintainer applies `audit` |
-
-`min-permission` (default `write`) is checked against the author's actual repository role, not the
-event's author association, so private organization members are recognized.
-
-- **Follow-ups:** after a `needs-info` verdict, a comment or edit by the issue author starts the next
-  round. Comments from anyone else do not. After `max-rounds` (default 3) automatic rounds, only a
-  maintainer can restart.
-- **Command:** a comment starting with `/audit` from someone with `min-permission` audits again,
-  regardless of the round limit.
-- **Ignored:** pull requests, closed issues, and events sent by bots.
-
-## Security
-
-- The agent runs read-only: Claude Code gets only `Read`, `Grep` and `Glob`; Codex runs in its
-  read-only sandbox. Checkout does not persist Git credentials.
-- The agent never receives the GitHub token or Actions tokens. It returns a structured verdict, and a
-  separate fixed step validates it and writes the labels and comment.
-- Issue text is passed as untrusted data. The verdict is bounded and sanitized before posting:
-  hidden HTML comments and images are removed, and `@` mentions cannot notify anyone.
-- `max-budget-usd` (Claude Code only) and `timeout-minutes` bound each audit's cost and time.
-
-On public repositories anyone can open issues, so keep the default `trusted-or-label` or `label`
-trigger.
+This repository's own workflow, [`.github/workflows/issue-audit.yml`](../../workflows/issue-audit.yml),
+does nothing until the repository variable `ZEROSHOT_ISSUE_AUDIT_ENABLED` is `true`. It reads the
+Claude Code OAuth token from the `ZEROSHOT_ISSUE_AUDIT_CLAUDE_CODE_OAUTH_TOKEN` secret.
 
 ## Inputs
 
-See [`action.yml`](action.yml) for every input and its default. Harness versions default to the
-versions pinned in the Zeroshot target image.
+| Input                     | Default                    | Meaning                                                                                                |
+| ------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `github-token`            | `github.token`             | Token for the decide and publish steps. Never reaches the agent.                                       |
+| `harness`                 | `claude-code`              | `claude-code` or `codex`.                                                                              |
+| `model`                   | harness default            | Model identifier, passed to the harness unchanged.                                                     |
+| `claude-code-oauth-token` |                            | Claude Code OAuth token. Use this or `anthropic-api-key`.                                              |
+| `anthropic-api-key`       |                            | Anthropic API key for `claude-code`.                                                                   |
+| `openai-api-key`          |                            | OpenAI API key, required for `codex`.                                                                  |
+| `claude-code-version`     | `2.1.276`                  | Exact `@anthropic-ai/claude-code` version.                                                             |
+| `codex-version`           | `0.155.0`                  | Exact `@openai/codex` version.                                                                         |
+| `trigger-mode`            | `both`                     | `trusted-authors`, `label` or `both`.                                                                  |
+| `minimum-author-role`     | `write`                    | Minimum role (`read`, `triage`, `write`, `maintain`, `admin`) of authors whose new issues are audited. |
+| `maintainer-role`         | `write`                    | Minimum role (`triage` or higher) to use the audit label or command.                                   |
+| `audit-label`             | `audit`                    | Label a maintainer applies to request an audit.                                                        |
+| `ready-label`             | `ready-for-implementation` | Label for issues ready for implementation.                                                             |
+| `needs-information-label` | `needs-information`        | Label for issues awaiting answers from their author.                                                   |
+| `command`                 | `/audit`                   | Maintainer comment command that requests a new audit.                                                  |
+| `max-rounds`              | `3`                        | Automatic audit rounds (1–10) before a maintainer must restart.                                        |
+| `max-questions`           | `3`                        | Questions per needs-information verdict (1–10).                                                        |
+| `timeout-minutes`         | `10`                       | Wall-clock limit for the agent (1–60).                                                                 |
+| `max-turns`               | `30`                       | Claude Code turn limit (1–200).                                                                        |
+| `max-budget-usd`          | `1`                        | Claude Code spend limit per audit in US dollars.                                                       |
+
+The default harness versions match the versions pinned in
+[`docker/zeroshot-target/Dockerfile`](../../../docker/zeroshot-target/Dockerfile). Invalid inputs
+fail the job before any audit.
+
+Outputs: `audited`, `reason`, `round` and `verdict`.
+
+## Triggers
+
+The trigger decision runs first, before any model credential is read or any model is called.
+
+| Event                                                                  | Audits when                                                                                                                    |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Issue opened                                                           | `trigger-mode` is `trusted-authors` or `both` and the author's actual repository role is at least `minimum-author-role`.       |
+| `audit-label` applied                                                  | `trigger-mode` is `label` or `both` and the person applying it has at least `maintainer-role`.                                 |
+| Issue author comments, or edits the issue title or body                | The latest audit asked questions, the issue still has `needs-information-label`, and fewer than `max-rounds` rounds were used. |
+| A comment whose first line is `command`, from a `maintainer-role` user | Always, even after the round cap. It starts a new count at round 1.                                                            |
+
+Roles come from the repository collaborator permission API, not from the event's author association.
+Pull requests, closed issues and events sent by bots never trigger an audit. An issue opened with
+the audit label already applied by a maintainer is audited once, by the label event.
+
+Rounds are counted from the hidden marker at the start of each audit comment. Only bot-authored
+comments count, so pasting a marker cannot change the count. Applying the audit label or using the
+command restarts at round 1. The comment for the final automatic round says how a maintainer can
+restart.
+
+## Results
+
+- **Ready:** the action adds `ready-label`, removes `needs-information-label` and `audit-label`, and
+  posts a short summary.
+- **Needs information:** the action adds `needs-information-label`, removes `ready-label` and
+  `audit-label`, and posts at most `max-questions` questions, each with a suggested default. The
+  heading shows the round, such as "round 1 of 3".
+
+## Security model
+
+- **Separated steps.** A deterministic step decides whether to audit and builds the prompt. The agent
+  step receives only the model credential. A separate deterministic step validates the verdict and
+  performs every GitHub write. The GitHub token is never passed to the agent step.
+- **Allowlisted agent environment.** The harness runs with only `PATH`, a private `HOME` and
+  `TMPDIR`, locale settings, and the selected credential. Job-level environment variables, the
+  GitHub token and runner variables are dropped.
+- **Read-only checkout.** The repository is checked out with `persist-credentials: false` and made
+  read-only before the agent runs. Claude Code gets only the `Read`, `Grep` and `Glob` tools, no MCP
+  servers and no repository settings. Codex runs in its `read-only` sandbox without web search.
+- **Untrusted issue text.** Issue titles, bodies and comments are bounded, stripped of hidden
+  characters and fenced by a random boundary. The prompt tells the agent to treat them as data.
+- **Validated output.** The verdict must match a strict schema: a known verdict, a bounded summary
+  and, for needs-information, 1 to `max-questions` questions with suggested defaults. Anything else,
+  including output containing a supplied credential or a credential-shaped value, fails the job
+  without posting.
+- **Sanitized comments.** Before posting, agent text is collapsed to one line per field, bounded,
+  stripped of control, bidirectional, zero-width and tag characters, has its Markdown and HTML
+  syntax escaped, and has `@` replaced with a full-width `＠`. Agent output cannot mention people,
+  format links, embed images or HTML, or hide content in HTML comments.
+- **Bounded cost and time.** The agent stops at `timeout-minutes`. Claude Code also stops at
+  `max-turns` and `max-budget-usd`. Codex has no spend limit, so the timeout and the bounded prompt
+  bound its cost. Rounds are capped by `max-rounds`.
+
+The agent can read files the runner user can read. Use GitHub-hosted runners or dedicated
+self-hosted runners without other secrets on disk.
