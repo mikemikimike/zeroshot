@@ -1815,7 +1815,7 @@ rule.</p>
 <h2 id="four-explicit-choices">Four explicit choices<a class="headerlink" href="#four-explicit-choices" title="Permanent link">&para;</a></h2>
 <p>Each agent node uses:</p>
 <ol>
-<li>a <strong>harness</strong>, <code>codex</code>, <code>claude</code>, or <code>copilot</code>;</li>
+<li>a <strong>harness</strong>, <code>codex</code>, <code>claude</code>, <code>copilot</code>, or <code>pi</code>;</li>
 <li>a <strong>provider</strong> supported by that harness;</li>
 <li>an opaque provider-owned <strong>model</strong> identifier;</li>
 <li>zero or more named <strong>connections</strong>, each declaring exact environment field names.</li>
@@ -1827,8 +1827,9 @@ Claude Code review. Zeroshot starts one harness adapter per distinct effective l
 runs on its own lane's CLI. Model and connections are always chosen per node.</p>
 <p>The <a href="../../reference/runtime-plan/#harness-and-provider">RuntimePlan reference</a> lists the accepted
 harness/provider pairs, which apply to the default lane and to every node's lane. Admission rejects
-known-incompatible pairs, such as <code>codex</code> with <code>anthropic</code> and <code>claude</code> with <code>openai</code>. Zeroshot does
-not check current provider availability, and model names remain provider-owned.</p>
+known-incompatible pairs, such as <code>codex</code> with <code>anthropic</code>, <code>claude</code> with <code>openai</code>, and <code>pi</code> with
+<code>github</code>. Zeroshot does not check current provider availability, and model names remain
+provider-owned.</p>
 <h2 id="uniform-and-exact-plans">Uniform and exact plans<a class="headerlink" href="#uniform-and-exact-plans" title="Permanent link">&para;</a></h2>
 <p><code>--uniform-runtime-config</code> expands one agent binding across all executable nodes, which keeps a
 built-in template configuration short:</p>
@@ -1858,9 +1859,9 @@ session; see <a href="../../reference/runtime-plan/#agent">session scope</a>.</p
 them out of the graph, runtime JSON, run ledger, and observation records.</p>
 <p>When <code>connections</code> is omitted, Zeroshot materializes provider access for each node from its
 effective lane and the selected execution placement. On a local run, nodes on the <code>codex</code>/<code>openai</code>,
-<code>claude</code>/<code>anthropic</code>, and <code>copilot</code>/<code>github</code> lanes reuse the harness's native login and
-configuration without inventing a connection. On a contained target, or on any non-native provider
-lane, a node receives these canonical requirements:</p>
+<code>claude</code>/<code>anthropic</code>, <code>copilot</code>/<code>github</code>, <code>pi</code>/<code>anthropic</code>, and <code>pi</code>/<code>openai</code> lanes reuse the
+harness's native login and configuration without inventing a connection. On a contained target, or
+on any non-native provider lane, a node receives these canonical requirements:</p>
 <table>
 <thead>
 <tr>
@@ -1902,6 +1903,9 @@ lane, a node receives these canonical requirements:</p>
 </tr>
 </tbody>
 </table>
+<p>A <code>pi</code> gateway run additionally requires <code>GATEWAY_API</code>, which names the wire protocol
+(<code>openai-responses</code>, <code>openai-completions</code>, or <code>anthropic-messages</code>). The Codex and Claude gateway
+lanes do not use it.</p>
 <p>A run's connection requirements are the union over its nodes. A contained run with a Codex/OpenAI
 worker and Claude/Anthropic reviewers can therefore require both <code>OPENAI_API_KEY</code> and
 <code>ANTHROPIC_API_KEY</code>.</p>
@@ -1923,7 +1927,7 @@ updating a multi-field connection. <code>connection list</code> reports names an
 <p>Hosted targets can also own user- or organization-scoped connections. Setup and dynamic connection
 kinds depend on the target; Zeroshot consumes only the resolved fields declared by the runtime.</p>
 <h2 id="gateways">Gateways<a class="headerlink" href="#gateways" title="Permanent link">&para;</a></h2>
-<p>Use <code>provider: "gateway"</code> with <code>codex</code> or <code>claude</code> and the gateway's model identifier:</p>
+<p>Use <code>provider: "gateway"</code> with <code>codex</code>, <code>claude</code>, or <code>pi</code> and the gateway's model identifier:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"harness"</span><span class="p">:</span><span class="w"> </span><span class="s2">"codex"</span><span class="p">,</span><span class="w"> </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gateway"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PROVIDER_MODEL_ID"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>Store the endpoint and key together through the existing connection command:</p>
@@ -1931,7 +1935,9 @@ kinds depend on the target; Zeroshot consumes only the resolved fields declared 
 </code></pre></div>
 <p>Codex requires the OpenAI <strong>Responses API</strong>, including streaming and tool calls; Chat Completions
 alone is insufficient. It sends the key as a bearer token. Claude requires the Anthropic <strong>Messages
-API</strong> and sends the key in <code>x-api-key</code>. The selected gateway/model must support the harness's
+API</strong> and sends the key in <code>x-api-key</code>. The <code>pi</code> gateway lane lets the caller name the wire protocol
+in <code>GATEWAY_API</code> and reaches any endpoint Pi implements without probing it; an unrecognized value
+fails before launch. The selected gateway/model must support the harness's
 requests, including structured output. Zeroshot does not probe capabilities or translate protocols.</p>
 <p>Supply the base URL expected by the selected harness, including any gateway path prefix. Zeroshot
 preserves that path. For OpenRouter, use <code>https://openrouter.ai/api/v1</code> with Codex or
@@ -1982,7 +1988,7 @@ resume selects the caller's current executable again.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-15">15 October 2026</time>
+    Last updated <time datetime="2026-10-18">18 October 2026</time>
   </span>
 
     
