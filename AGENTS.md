@@ -687,6 +687,7 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
 | Release workflow              | `.github/workflows/release.yml`                                                                                                                                                                   |
 | Python release workflow       | `.github/workflows/release-python.yml`                                                                                                                                                            |
 | CI classifier                 | `.github/ci-path-classifier.js`                                                                                                                                                                   |
+| Issue audit action            | `.github/actions/issue-audit/`, `.github/workflows/issue-audit.yml`                                                                                                                               |
 | Repository tooling tests      | `tests/tooling/`                                                                                                                                                                                  |
 
 ## Shared workspace UI
