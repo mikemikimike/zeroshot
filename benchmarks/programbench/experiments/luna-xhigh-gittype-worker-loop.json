@@ -1,0 +1,65 @@
+{
+  "id": "luna-xhigh-gittype-worker-loop",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on gittype (terminal typing game that uses source code as typing challenges, written in Rust): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-gittype-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-gittype-v1 through the single GPT-5.6 Sol workers of sol-xhigh-gittype-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "task": {
+    "instance_id": "unhappychoice__gittype.34b72d0",
+    "image": "programbench/unhappychoice_1776_gittype.34b72d0:task_cleanroom_v6@sha256:f05d92f5095a6304b0ec4b5e3f14f13272689647208a1f9e700d90279816959e",
+    "reference_path": "/reference/executable",
+    "adjustments_rationale": "The reference moves to a root-owned directory outside the workspace (the task statement points there), so builders cannot overwrite or delete it at the build target's path. This adjustment is general, not specific to the task. The bundled documentation is left as shipped: no task-specific corrections.",
+    "fidelity_reference": {
+      "submission": "20260508_mini-v2.2.6_gpt-5-5-xhigh",
+      "commit": "530a7b8f969840d17efac1e1e5aaca1078cc2b3a",
+      "archive_url": "https://huggingface.co/datasets/programbench/20260508_mini-v2.2.6_gpt-5-5-xhigh/resolve/main/unhappychoice__gittype.34b72d0/submission.tar.gz",
+      "archive_sha256": "f9138090af91640174c13344e8543278cd3cb0ae57b263414a639b2771a1e72a",
+      "registry_commit": "794fa30bbfd65059d5c67e192ceb6da659c9ef51"
+    }
+  },
+  "model": {
+    "id": "gpt-5.6-luna",
+    "effort": "xhigh"
+  },
+  "arms": {
+    "loop": {
+      "repeats": 5,
+      "max_iterations": 50,
+      "worker_only": true
+    }
+  },
+  "order": [
+    "loop",
+    "loop",
+    "loop",
+    "loop",
+    "loop"
+  ],
+  "limits": {
+    "attempt_seconds": 21600,
+    "build_timeout_ms": 10800000,
+    "check_timeout_ms": 3600000
+  },
+  "resources": {
+    "concurrency": 5,
+    "cpus": 4,
+    "memory": "7g",
+    "pids_limit": 65536
+  },
+  "eval": {
+    "workers": 8,
+    "docker_cpus": 3,
+    "timeout_seconds": 43200,
+    "rounds": [
+      1
+    ]
+  },
+  "pricing": {
+    "model": "gpt-5.6-luna",
+    "usd_per_million_tokens": {
+      "input": 0.2,
+      "cached_input": 0.02,
+      "cache_write": 0.25,
+      "output": 1.2
+    },
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "retrieved": "2026-09-23"
+  }
+}

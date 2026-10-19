@@ -113,6 +113,11 @@ class Experiment:
         return self.raw["arms"]["loop"]["max_iterations"]
 
     @property
+    def worker_only(self) -> bool:
+        """A loop arm without its checker: the build node alone, repeated in its own session."""
+        return bool(self.raw["arms"].get("loop", {}).get("worker_only", False))
+
+    @property
     def check_session_scope(self) -> str:
         """``execution`` (a fresh checker session every round) or ``node_instance`` (one session kept
         across the loop's rounds); the runtime plan's ``sessionScope`` for the check node."""
@@ -198,8 +203,10 @@ def _validate(raw: dict[str, Any]) -> None:
         raise ValueError(f"prompts.build must be one of {BUILD_PROMPTS}, and only a single-arm experiment may change it")
     if set(arms) - set(ARMS):
         raise ValueError(f"unknown arms: {set(arms) - set(ARMS)}")
-    if "loop" in arms and (set(arms["loop"]) - {"repeats", "max_iterations", "check_session_scope"} or arms["loop"].get("check_session_scope", "execution") not in CHECK_SESSION_SCOPES):
-        raise ValueError(f"arms.loop takes repeats, max_iterations and check_session_scope (one of {CHECK_SESSION_SCOPES})")
+    if "loop" in arms and (set(arms["loop"]) - {"repeats", "max_iterations", "check_session_scope", "worker_only"} or arms["loop"].get("check_session_scope", "execution") not in CHECK_SESSION_SCOPES):
+        raise ValueError(f"arms.loop takes repeats, max_iterations, check_session_scope (one of {CHECK_SESSION_SCOPES}) and worker_only")
+    if "loop" in arms and (not isinstance(arms["loop"].get("worker_only", False), bool) or (arms["loop"].get("worker_only") and "check_session_scope" in arms["loop"])):
+        raise ValueError("arms.loop.worker_only is true or false, and a loop without a checker has no checker session")
     if "single" in arms and set(arms["single"]) != {"repeats"}:
         raise ValueError("arms.single takes repeats only")
     order = raw["order"]

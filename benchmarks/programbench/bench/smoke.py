@@ -296,7 +296,8 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
     schedule = smoke.exp.raw["eval"].get("rounds")
     expected = {"build-1", "final"} | ({"check-1"} if schedule is None else {f"build-{r}" for r in schedule if r <= (loop or {}).get("builds", 0)})
     smoke.check("pipeline_loop_snapshots_by_round", lambda: (bool(loop) and expected <= set(loop["rounds"]), loop and sorted(loop["rounds"])))
-    smoke.check("pipeline_loop_ran_its_rounds", lambda: (bool(loop) and loop["builds"] - 1 <= loop["checks"] <= loop["builds"] and loop["builds"] >= min(3, smoke.exp.max_iterations), {"builds": loop and loop["builds"], "checks": loop and loop["checks"], "max": smoke.exp.max_iterations}))
+    checks_expected = (lambda builds, checks: checks == 0) if smoke.exp.worker_only else (lambda builds, checks: builds - 1 <= checks <= builds)
+    smoke.check("pipeline_loop_ran_its_rounds", lambda: (bool(loop) and checks_expected(loop["builds"], loop["checks"]) and loop["builds"] >= min(3, smoke.exp.max_iterations), {"builds": loop and loop["builds"], "checks": loop and loop["checks"], "max": smoke.exp.max_iterations, "worker_only": smoke.exp.worker_only}))
     smoke.check("pipeline_snapshots_without_errors", lambda: (all(not any("error" in s for s in (a.get("snapshots") or {}).values()) for a in attempts.values()), {k: {n: s.get("seconds") for n, s in (a.get("snapshots") or {}).items()} for k, a in attempts.items()}))
     if "single" in arms:
         smoke.check("pipeline_single_snapshot_equals_final", lambda: (
@@ -325,7 +326,7 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
         interrupted (timeout, force-stop), so only nodes whose executions all ended normally are
         compared."""
         detail: dict[str, Any] = {}
-        fresh_checks = smoke.exp.check_session_scope == "execution"
+        fresh_checks = smoke.exp.check_session_scope == "execution" and not smoke.exp.worker_only
         for a in attempts.values():
             ledger_nodes, nodes = a["tokens"].get("ledger_nodes") or {}, a["tokens"]["nodes"]
             # A force-stop interrupts one execution: the checks are still comparable when every
@@ -345,7 +346,7 @@ def pipeline_checks(smoke: Smoke, summary: dict[str, Any]) -> None:
                 same = ledger_usage == transcript_usage
                 detail[f"{a['label']}.{node}"] = "match" if same else {"ledger": ledger_usage, "transcripts": transcript_usage}
         compared = [v for v in detail.values() if not str(v).startswith("skipped")]
-        if not compared:  # a kept checker session leaves no fresh thread to compare in a loop-only smoke
+        if not compared:  # a kept checker session, or no checker, leaves no fresh thread to compare in a loop-only smoke
             return not fresh_checks, detail or "no fresh-session node to compare"
         return all(v == "match" for v in compared), detail
 

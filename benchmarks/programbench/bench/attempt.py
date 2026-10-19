@@ -118,13 +118,15 @@ def _retry_once(probe):
 def run_files(exp: Experiment, arm: str) -> dict[str, Any]:
     builder, checker = prompt(exp.build_prompt), prompt("checker")
     limits = exp.limits
-    if arm == "loop":
+    if arm == "loop" and exp.worker_only:
+        graph = graphs.worker_loop_graph(builder, exp.max_iterations, limits["build_timeout_ms"])
+    elif arm == "loop":
         graph = graphs.loop_graph(builder, checker, exp.max_iterations, limits["build_timeout_ms"], limits["check_timeout_ms"])
     else:
         graph = graphs.single_graph(builder, limits["build_timeout_ms"])
     return {
         "graph.json": graph,
-        "runtime.json": graphs.runtime_plan(arm, exp.model, exp.effort, exp.check_session_scope),
+        "runtime.json": graphs.runtime_plan(arm, exp.model, exp.effort, exp.check_session_scope, exp.worker_only),
         "input.json": {"task": task_statement(exp)},
     }
 

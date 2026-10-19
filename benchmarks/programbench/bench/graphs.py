@@ -147,10 +147,45 @@ def loop_graph(builder: str, checker: str, max_iterations: int, build_timeout_ms
     )
 
 
-def runtime_plan(arm: str, model: str, effort: str, check_session_scope: str = "execution") -> dict[str, Any]:
+def worker_loop_graph(builder: str, max_iterations: int, build_timeout_ms: int) -> dict[str, Any]:
+    """The loop without its checker: ``build`` runs ``max_iterations`` times in the builder's own session.
+    Nothing writes ``feedback``, so every round re-prompts the builder with the task and empty feedback
+    (round 1 is byte-identical to the single arm's build). The run ends ``unverified``; the final
+    workspace is what gets scored."""
+    state = _record("feedback", "task")
+    return _graph(
+        {
+            "kind": "seq",
+            "name": "run",
+            "state": state,
+            "children": [
+                {
+                    "kind": "loop",
+                    "name": "solve",
+                    "state": copy.deepcopy(state),
+                    "body": {
+                        "kind": "seq",
+                        "name": "round",
+                        "state": copy.deepcopy(state),
+                        "children": [build_node(builder, build_timeout_ms)],
+                        "promotedStatePaths": [],
+                    },
+                    "until": None,
+                    "maxIterations": max_iterations,
+                    "promotedStatePaths": [],
+                },
+                {"kind": "fail", "name": "unverified", "reason": "unverified"},
+            ],
+            "promotedStatePaths": [],
+        }
+    )
+
+
+def runtime_plan(arm: str, model: str, effort: str, check_session_scope: str = "execution", worker_only: bool = False) -> dict[str, Any]:
     """Exact runtime plan. The builder resumes its own session across rounds; each check is fresh unless
-    ``check_session_scope`` is ``node_instance``, which keeps one checker session across the rounds."""
+    ``check_session_scope`` is ``node_instance``, which keeps one checker session across the rounds. A
+    ``worker_only`` loop has no check node."""
     nodes = {"build": {"kind": "agent", "model": model, "effort": effort, "sessionScope": "node_instance"}}
-    if arm == "loop":
+    if arm == "loop" and not worker_only:
         nodes["check"] = {"kind": "agent", "model": model, "effort": effort, "sessionScope": check_session_scope}
     return {"harness": HARNESS, "provider": PROVIDER, "size": "medium", "nodes": nodes}

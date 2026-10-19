@@ -102,6 +102,17 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(loop["body"]["children"][1]["writeBindings"][0]["target"], ["feedback"])
         self.assertEqual(loop["promotedStatePaths"], [["feedback"]])
 
+    def test_worker_loop_is_the_builder_alone_repeated(self):
+        exp = config.load("experiments/luna-xhigh-svgbob-worker-loop.json")
+        files, plain = run_files(exp, "loop"), run_files(EXPERIMENT, "loop")
+        loop = files["graph.json"]["root"]["children"][0]
+        self.assertEqual([c["name"] for c in loop["body"]["children"]], ["build"])
+        self.assertEqual(loop["body"]["children"][0], plain["graph.json"]["root"]["children"][0]["body"]["children"][0])  # the same build node
+        self.assertEqual((loop["until"], loop["maxIterations"]), (None, 50))
+        self.assertEqual(files["graph.json"]["root"]["children"][1], {"kind": "fail", "name": "unverified", "reason": "unverified"})
+        self.assertEqual(files["input.json"], plain["input.json"])
+        self.assertEqual(files["runtime.json"], {**plain["runtime.json"], "nodes": {"build": plain["runtime.json"]["nodes"]["build"]}})
+
     def test_runtime_sessions(self):
         plan = graphs.runtime_plan("loop", "m", "xhigh")
         self.assertEqual(plan["nodes"]["build"]["sessionScope"], "node_instance")
@@ -260,6 +271,28 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual({k: v for k, v in smoke.raw.items() if k not in ("id", "description", "arms")}, {k: v for k, v in plain.raw.items() if k not in ("id", "description", "arms")})
         raw = EXPERIMENT.raw
         for bad in ({**raw, "arms": {"loop": {**raw["arms"]["loop"], "check_session_scope": "fresh"}}}, {**raw, "arms": {"loop": {**raw["arms"]["loop"], "resume_checker": True}}}):
+            with self.assertRaises(ValueError, msg=bad):
+                self._load(bad)
+
+    def test_the_worker_only_study_removes_the_checker_and_nothing_else(self):
+        paths = sorted(ROOT.glob("experiments/luna-xhigh-*-worker-loop.json"))
+        self.assertEqual(len(paths), 20)
+        for path in paths:
+            exp = config.load(path)
+            loop = config.load(f"experiments/{exp.id.removesuffix('-worker-loop')}-v1.json")
+            self.assertTrue(exp.worker_only and not loop.worker_only)
+            self.assertEqual(set(exp.raw), EXPERIMENT_KEYS)
+            for key in ("task", "model", "order", "limits", "resources", "eval", "pricing"):
+                self.assertEqual(exp.raw[key], loop.raw[key], key)
+            self.assertEqual(exp.raw["arms"], {"loop": {**loop.raw["arms"]["loop"], "worker_only": True}})
+            self.assertEqual(run_files(exp, "loop")["input.json"], run_files(loop, "loop")["input.json"])
+            self.assertIn(loop.id, exp.raw["description"])
+        smoke, plain = config.load("experiments/smoke-svgbob-worker-loop.json"), config.load("experiments/smoke-svgbob.json")
+        self.assertTrue(smoke.worker_only)
+        self.assertEqual({k: v for k, v in smoke.raw.items() if k not in ("id", "description", "arms")}, {k: v for k, v in plain.raw.items() if k not in ("id", "description", "arms")})
+        raw = EXPERIMENT.raw
+        for bad in ({**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": "yes"}}},
+                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True, "check_session_scope": "node_instance"}}}):
             with self.assertRaises(ValueError, msg=bad):
                 self._load(bad)
 
