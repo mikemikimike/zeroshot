@@ -18,6 +18,9 @@ CHECK_SESSION_SCOPES = ("execution", "node_instance")
 # Instructions for the build node (prompts/<name>.md). builder-checker runs the loop's two roles in
 # one session (the builder's and checker's prompts verbatim); only a single arm may use it.
 BUILD_PROMPTS = ("builder", "builder-checker")
+# What a worker-only loop's builder is told every round (prompts/<name>.md): a bare "Continue.", or a
+# self-review that asks it to check its own work against the task again and fix what it finds.
+FEEDBACK_PROMPTS = ("continue", "self-review")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 # The agents run in Codex against OpenAI's API; the egress proxy's allowlist holds that one host.
 HARNESS, PROVIDER, SECRET_ENV, API_HOST = "codex", "openai", "OPENAI_API_KEY", "api.openai.com"
@@ -118,8 +121,9 @@ class Experiment:
         return bool(self.raw["arms"].get("loop", {}).get("worker_only", False))
 
     @property
-    def feedback(self) -> str | None:
-        """The feedback a worker-only loop's builder receives in every round (the graph writes none)."""
+    def feedback_prompt(self) -> str | None:
+        """The prompt file whose text a worker-only loop's builder receives as feedback every round
+        (the graph writes none)."""
         return self.raw.get("prompts", {}).get("feedback")
 
     @property
@@ -207,8 +211,8 @@ def _validate(raw: dict[str, Any]) -> None:
     if set(prompts) - {"build", "feedback"} or prompts.get("build", "builder") not in BUILD_PROMPTS or (prompts.get("build", "builder") != "builder" and "loop" in arms):
         raise ValueError(f"prompts.build must be one of {BUILD_PROMPTS}, and only a single-arm experiment may change it")
     worker_only = bool(arms.get("loop", {}).get("worker_only", False))
-    if "feedback" in prompts and (not worker_only or not isinstance(prompts["feedback"], str) or not prompts["feedback"].strip()):
-        raise ValueError("prompts.feedback is the text a worker-only loop's builder receives every round, and needs such a loop")
+    if worker_only != ("feedback" in prompts) or (worker_only and prompts["feedback"] not in FEEDBACK_PROMPTS):
+        raise ValueError(f"a worker-only loop names the feedback its builder receives every round, prompts.feedback, one of {FEEDBACK_PROMPTS}; no other experiment does")
     if set(arms) - set(ARMS):
         raise ValueError(f"unknown arms: {set(arms) - set(ARMS)}")
     if "loop" in arms and (set(arms["loop"]) - {"repeats", "max_iterations", "check_session_scope", "worker_only"} or arms["loop"].get("check_session_scope", "execution") not in CHECK_SESSION_SCOPES):

@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-keifu-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on keifu (terminal interface for navigating and visualizing Git commit graphs, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-keifu-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-keifu-v1 through the single GPT-5.6 Sol workers of sol-xhigh-keifu-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on keifu (terminal interface for navigating and visualizing Git commit graphs, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-keifu-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-keifu-v1 through the single GPT-5.6 Sol workers of sol-xhigh-keifu-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "trasta298__keifu.3331426",
     "image": "programbench/trasta298_1776_keifu.3331426:task_cleanroom_v6@sha256:7c2c61d79f8e6fd8f5224f09598cde496d6af29a838cd7f41c7cf08c315a1b76",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

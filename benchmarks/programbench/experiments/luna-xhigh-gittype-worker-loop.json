@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-gittype-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on gittype (terminal typing game that uses source code as typing challenges, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-gittype-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-gittype-v1 through the single GPT-5.6 Sol workers of sol-xhigh-gittype-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on gittype (terminal typing game that uses source code as typing challenges, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-gittype-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-gittype-v1 through the single GPT-5.6 Sol workers of sol-xhigh-gittype-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "unhappychoice__gittype.34b72d0",
     "image": "programbench/unhappychoice_1776_gittype.34b72d0:task_cleanroom_v6@sha256:f05d92f5095a6304b0ec4b5e3f14f13272689647208a1f9e700d90279816959e",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

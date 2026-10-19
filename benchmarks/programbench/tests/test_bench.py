@@ -74,9 +74,11 @@ class GraphTests(unittest.TestCase):
         build, check = loop["root"]["children"][0]["body"]["children"]
         self.assertEqual(build["instructions"], config.prompt("builder"))
         self.assertEqual(check["instructions"], config.prompt("checker"))
-        for text in (build["instructions"], check["instructions"]):
+        for text in (build["instructions"], check["instructions"], config.prompt("continue"), config.prompt("self-review")):
             for word in ("ProgramBench", "svgbob", "SVG", "reverse", "executable"):
                 self.assertNotIn(word, text)
+        self.assertEqual(config.prompt("continue"), "Continue.")
+        self.assertTrue(config.prompt("self-review").startswith("Continue. The result has not been accepted."))
 
     def test_prompt_study_runs_both_roles_in_one_build_node(self):
         combined = config.prompt("builder-checker")
@@ -282,7 +284,11 @@ class ConfigTests(unittest.TestCase):
             exp = config.load(path)
             loop = config.load(f"experiments/{exp.id.removesuffix('-worker-loop')}-v1.json")
             self.assertTrue(exp.worker_only and not loop.worker_only)
-            self.assertEqual((set(exp.raw), exp.raw["prompts"], exp.feedback), (EXPERIMENT_KEYS | {"prompts"}, {"feedback": "Continue."}, "Continue."))
+            self.assertEqual((set(exp.raw), exp.raw["prompts"], exp.feedback_prompt), (EXPERIMENT_KEYS | {"prompts"}, {"feedback": "continue"}, "continue"))
+            review = config.load(f"experiments/{exp.id.removesuffix('-worker-loop')}-self-review.json")
+            self.assertEqual({k: v for k, v in review.raw.items() if k not in ("id", "description", "prompts")}, {k: v for k, v in exp.raw.items() if k not in ("id", "description", "prompts")})
+            self.assertEqual((review.raw["prompts"], run_files(review, "loop")["input.json"]["feedback"]), ({"feedback": "self-review"}, config.prompt("self-review")))
+            self.assertEqual({**run_files(review, "loop"), "input.json": None}, {**run_files(exp, "loop"), "input.json": None})
             for key in ("task", "model", "order", "limits", "resources", "eval", "pricing"):
                 self.assertEqual(exp.raw[key], loop.raw[key], key)
             self.assertEqual(exp.raw["arms"], {"loop": {**loop.raw["arms"]["loop"], "worker_only": True}})
@@ -294,8 +300,9 @@ class ConfigTests(unittest.TestCase):
         raw = EXPERIMENT.raw
         for bad in ({**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": "yes"}}},
                     {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True, "check_session_scope": "node_instance"}}},
-                    {**raw, "prompts": {"feedback": "Continue."}},  # feedback without a worker-only loop
-                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True}}, "prompts": {"feedback": " "}}):
+                    {**raw, "prompts": {"feedback": "continue"}},  # feedback without a worker-only loop
+                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True}}},  # a worker-only loop without its feedback
+                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True}}, "prompts": {"feedback": "builder"}}):
             with self.assertRaises(ValueError, msg=bad):
                 self._load(bad)
 

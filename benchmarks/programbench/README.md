@@ -19,7 +19,8 @@ independent checker whose rejection becomes the builder's feedback for the next 
    with a checker that keeps its session across rounds, so it remembers what it rejected and the fixes
    it asked for.
 4. **Worker only.** Is it the checker, or just more rounds? The loop runs without its checker: the
-   builder alone, told "Continue." in its own session round after round until Sol's budget is spent.
+   builder alone, told "Continue." in its own session round after round, and in a second variant told
+   to review its own work against the task again and fix what it finds.
 
 Twenty tasks, 5 runs per arm per task. Every task is reported; there is no pooled test across tasks.
 
@@ -124,12 +125,14 @@ Each task has three experiment files and a smoke test (`experiments/`):
 | `sol-xhigh-<task>-single.json` | single worker (the build node alone) | 5 | GPT-5.6 Sol, xhigh |
 | `luna-xhigh-<task>-prompt.json` | single session with `prompts/builder-checker.md`, 6-hour node limit | 5 | GPT-5.6 Luna, xhigh |
 | `luna-xhigh-<task>-checker-resumed.json` | loop, up to 50 rounds, the checker keeps its session across rounds | 5 | GPT-5.6 Luna, xhigh |
-| `luna-xhigh-<task>-worker-loop.json` | the builder alone, re-run in its session, up to 50 rounds | 5 | GPT-5.6 Luna, xhigh |
+| `luna-xhigh-<task>-worker-loop.json` | the builder alone, re-run in its session with "Continue.", up to 50 rounds | 5 | GPT-5.6 Luna, xhigh |
+| `luna-xhigh-<task>-self-review.json` | the builder alone, re-run in its session with a self-review instruction, up to 50 rounds | 5 | GPT-5.6 Luna, xhigh |
 | `smoke-<task>.json` | one 3-round loop with short limits | 1 | GPT-5.6 Luna, xhigh |
 
 `smoke-svgbob-sol.json` is the same smoke test with Sol and longer node limits;
-`smoke-svgbob-checker-resumed.json` is the smoke test with the checker's session kept and
-`smoke-svgbob-worker-loop.json` the one without a checker. All 20 tasks share one protocol: the same
+`smoke-svgbob-checker-resumed.json` is the smoke test with the checker's session kept,
+`smoke-svgbob-worker-loop.json` and `smoke-svgbob-self-review.json` the ones without a checker. All 20
+tasks share one protocol: the same
 prompts, graphs, limits (6 hours per run, 3 hours per build, 1 hour per check), resources (5 runs
 at once, 4 CPUs and 7 GB each), evaluation settings and prices. The experiment file declares one
 general adjustment to every task, applied by `agent/prepare-task.py` when the agent image is built
@@ -153,9 +156,18 @@ The graph, the prompts, the input and every limit are byte-identical to the loop
 
 The worker-only experiments (`arms.loop.worker_only`) are the loop with its check node removed: the
 build node runs up to 50 times in its own session, and every round re-prompts the builder with the
-task and the feedback the run started with, `prompts.feedback`, which is "Continue." (the graph
-writes no feedback of its own). The prompt, the limits and the prices are the loop's; round 1
-differs from the single worker's build by that one word of feedback.
+task and the feedback the run started with, `prompts.feedback` (the graph writes no feedback of its
+own): "Continue." (`prompts/continue.md`) in the worker-loop experiments, and in the self-review
+experiments:
+
+> Continue. The result has not been accepted. If the task is not complete, complete it. Then review
+> the current workspace against the task again, independently of your earlier conclusions: derive new
+> checks from the task statement and whatever it makes available, run them, and fix every discrepancy
+> you find without breaking what already works. Assume there are still defects until you have fresh,
+> concrete evidence that there are none.
+
+The prompt, the limits and the prices are the loop's; round 1 differs from the single worker's build
+by that feedback alone.
 
 ## Comparisons
 
@@ -184,9 +196,9 @@ set against the fresh-checker loop's, each difference with a 95% bootstrap inter
 Reported alongside: the model cost of a check round, the rounds within Sol's budget, and how often the
 checker accepted.
 
-**Worker only.** The same comparison for the loop without its checker: `bench parity` and `bench match`
-against `sol-xhigh-<task>-single`, and per task its score at Sol's mean cost, its cost to reach Sol's
-mean score and its final score against the loop's.
+**Worker only.** The same comparison for the loop without its checker, with either feedback:
+`bench parity` and `bench match` against `sol-xhigh-<task>-single`, and per task its score at Sol's
+mean cost, its cost to reach Sol's mean score and its final score against the loop's.
 
 A run enters a comparison only if it completed, its compared workspace was scored on all tests (a
 workspace that fails to compile or to produce a usable executable scores 0, as on the leaderboard;
@@ -404,7 +416,8 @@ test containers).
    published leaderboard submission on the task, which must agree with the leaderboard within 2
    points. On crowbook, dust, tree-sitter and samtools that last check fails by design (see Scoring
    and cost); every other check must pass. `smoke-svgbob-checker-resumed.json` is the smoke test for
-   the checker-session experiments and `smoke-svgbob-worker-loop.json` for the worker-only ones.
+   the checker-session experiments, `smoke-svgbob-worker-loop.json` and `smoke-svgbob-self-review.json`
+   for the worker-only ones.
 
    ```bash
    scripts/zsbench smoke experiments/smoke-svgbob.json
@@ -421,6 +434,7 @@ test containers).
    scripts/zsbench run experiments/luna-xhigh-svgbob-prompt.json
    scripts/zsbench run experiments/luna-xhigh-svgbob-checker-resumed.json   # the checker-session study
    scripts/zsbench run experiments/luna-xhigh-svgbob-worker-loop.json        # the worker-only study
+   scripts/zsbench run experiments/luna-xhigh-svgbob-self-review.json        # its self-review variant
    ```
 
 4. Compare. `parity` scores the loop's parity workspaces and writes
@@ -436,6 +450,8 @@ test containers).
    scripts/zsbench match experiments/luna-xhigh-svgbob-checker-resumed.json --against experiments/sol-xhigh-svgbob-single.json
    scripts/zsbench parity experiments/luna-xhigh-svgbob-worker-loop.json --against experiments/sol-xhigh-svgbob-single.json
    scripts/zsbench match experiments/luna-xhigh-svgbob-worker-loop.json --against experiments/sol-xhigh-svgbob-single.json
+   scripts/zsbench parity experiments/luna-xhigh-svgbob-self-review.json --against experiments/sol-xhigh-svgbob-single.json
+   scripts/zsbench match experiments/luna-xhigh-svgbob-self-review.json --against experiments/sol-xhigh-svgbob-single.json
    ```
 
 5. Repeat steps 2 to 4 for the other 19 tasks. On a large host, experiments can run side by side:

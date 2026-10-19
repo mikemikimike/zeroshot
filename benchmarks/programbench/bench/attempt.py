@@ -126,7 +126,7 @@ def run_files(exp: Experiment, arm: str) -> dict[str, Any]:
         graph = graphs.single_graph(builder, limits["build_timeout_ms"])
     run_input: dict[str, str] = {"task": task_statement(exp)}
     if arm == "loop" and exp.worker_only:
-        run_input["feedback"] = exp.feedback or ""
+        run_input["feedback"] = prompt(exp.feedback_prompt)
     return {
         "graph.json": graph,
         "runtime.json": graphs.runtime_plan(arm, exp.model, exp.effort, exp.check_session_scope, exp.worker_only),

@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-ditaa-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on ditaa (ASCII diagrams to PNG, written in Java; most tests compare PNG bytes): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-ditaa-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-ditaa-v1 through the single GPT-5.6 Sol workers of sol-xhigh-ditaa-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on ditaa (ASCII diagrams to PNG, written in Java; most tests compare PNG bytes): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-ditaa-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-ditaa-v1 through the single GPT-5.6 Sol workers of sol-xhigh-ditaa-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "stathissideris__ditaa.f2286c4",
     "image": "programbench/stathissideris_1776_ditaa.f2286c4:task_cleanroom_v6@sha256:6271e5146ae2ded77417a2ce53a549ca93cbf46a85d03e8e6b88e7e58ce891c2",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

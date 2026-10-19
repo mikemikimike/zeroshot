@@ -135,7 +135,7 @@ def _prepare(exp: config.Experiment, results: Path, allow_mixed: bool) -> tuple[
         "codex_config": info["codex_config"],
         "task_adjustments": info["task_adjustments"],
         "proxy_image": proxy_image,
-        "prompts": {name: config.prompt(name) for name in dict.fromkeys(("builder", "checker", "task", exp.build_prompt))},
+        "prompts": {name: config.prompt(name) for name in dict.fromkeys(("builder", "checker", "task", exp.build_prompt, *((exp.feedback_prompt,) if exp.feedback_prompt else ())))},
         "runner": {"python": platform.python_version()},
         "host": {"docker": docker("version", "--format", "{{.Server.Version}}").strip(), "cpus": docker("info", "--format", "{{.NCPU}}").strip(), "memory_bytes": docker("info", "--format", "{{.MemTotal}}").strip()},
     })

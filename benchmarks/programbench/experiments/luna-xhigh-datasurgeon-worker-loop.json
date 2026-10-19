@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-datasurgeon-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on datasurgeon (extracts structured data such as IPs, emails, and hashes from text, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-datasurgeon-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-datasurgeon-v1 through the single GPT-5.6 Sol workers of sol-xhigh-datasurgeon-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on datasurgeon (extracts structured data such as IPs, emails, and hashes from text, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-datasurgeon-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-datasurgeon-v1 through the single GPT-5.6 Sol workers of sol-xhigh-datasurgeon-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "drew-alleman__datasurgeon.d257cee",
     "image": "programbench/drew-alleman_1776_datasurgeon.d257cee:task_cleanroom_v6@sha256:344b5f872ab6305ef32cad7044758f383d4e2609642d3db61eb8e146274c9fe9",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

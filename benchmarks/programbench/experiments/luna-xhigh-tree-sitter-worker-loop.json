@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-tree-sitter-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on tree-sitter (incremental parsing library for building syntax-aware programming tools, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-tree-sitter-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-tree-sitter-v1 through the single GPT-5.6 Sol workers of sol-xhigh-tree-sitter-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on tree-sitter (incremental parsing library for building syntax-aware programming tools, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-tree-sitter-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-tree-sitter-v1 through the single GPT-5.6 Sol workers of sol-xhigh-tree-sitter-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "tree-sitter__tree-sitter.5e23cca",
     "image": "programbench/tree-sitter_1776_tree-sitter.5e23cca:task_cleanroom_v6@sha256:0f3e37c08718e68d6881da1b21a1edaf41d25b2f68a657cfd2707fd29aa9ceb7",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

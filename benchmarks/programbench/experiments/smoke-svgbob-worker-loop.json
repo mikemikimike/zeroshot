@@ -1,6 +1,6 @@
 {
   "id": "smoke-svgbob-worker-loop",
-  "description": "Pipeline smoke test for the luna-xhigh-<task>-worker-loop experiments: smoke-svgbob without the checker and with the feedback \"Continue.\" every round, one short run of 3 rounds.",
+  "description": "Pipeline smoke test for the luna-xhigh-<task>-worker-loop experiments: smoke-svgbob without the checker and with the feedback \"Continue.\" (prompts/continue.md) every round, one short run of 3 rounds.",
   "task": {
     "instance_id": "ivanceras__svgbob.6d00ad9",
     "image": "programbench/ivanceras_1776_svgbob.6d00ad9:task_cleanroom_v6@sha256:8656583769698b008c6ca1b02ca7da4207a4a3c7dc2d8105d82dc6ae0a2a6f67",
@@ -41,7 +41,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-parqeye-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on parqeye (terminal tool for inspecting and previewing Parquet file contents, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-parqeye-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-parqeye-v1 through the single GPT-5.6 Sol workers of sol-xhigh-parqeye-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on parqeye (terminal tool for inspecting and previewing Parquet file contents, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-parqeye-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-parqeye-v1 through the single GPT-5.6 Sol workers of sol-xhigh-parqeye-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "kaushiksrini__parqeye.8072121",
     "image": "programbench/kaushiksrini_1776_parqeye.8072121:task_cleanroom_v6@sha256:ce2e843ff186c1eb7b65d6c67499d6f74e93cf520f88dd8775479bb6346b6e1d",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {

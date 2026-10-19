@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-xz-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on xz (XZ Utils data compression tools and the liblzma library, written in C): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-xz-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-xz-v1 through the single GPT-5.6 Sol workers of sol-xhigh-xz-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on xz (XZ Utils data compression tools and the liblzma library, written in C): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" (prompts/continue.md) every round, up to 50 rounds; otherwise luna-xhigh-xz-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-xz-v1 through the single GPT-5.6 Sol workers of sol-xhigh-xz-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "tukaani-project__xz.1007bf0",
     "image": "programbench/tukaani-project_1776_xz.1007bf0:task_cleanroom_v6@sha256:8a5b7242a4bba4a6a40acf14c8c31c47667ea4e5f462a9a2eee94a012eeecab2",
@@ -19,7 +19,7 @@
     "effort": "xhigh"
   },
   "prompts": {
-    "feedback": "Continue."
+    "feedback": "continue"
   },
   "arms": {
     "loop": {
