@@ -889,6 +889,23 @@ class SecretTests(unittest.TestCase):
             self.assertFalse((results / "DO-NOT-PUBLISH.txt").exists())
 
 
+class LoopFactsTests(unittest.TestCase):
+    def test_loop_facts_come_from_the_summaries(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import loop_facts
+
+        attempt = {"label": "01-loop", "arm": "loop", "state": "complete", "builds": 4, "checks": 4, "terminal": {"status": "succeeded"}, "force_stopped": None,
+                   "wall_seconds": 1500, "cost_usd": {"build": 1.0, "check": 0.2, "total": 1.2}}
+        self.assertEqual(loop_facts.run_facts(attempt), {"state": "complete", "builds": 4, "checks": 4, "accepted": True, "force_stopped": False, "wall_minutes": 25.0,
+                                                         "cost_usd": 1.2, "cost_build_usd": 1.0, "cost_check_usd": 0.2, "usd_per_round": 0.3})
+        with tempfile.TemporaryDirectory() as tmp:
+            results = Path(tmp)
+            (results / "luna-xhigh-t-v1").mkdir()
+            (results / "luna-xhigh-t-v1" / "summary.json").write_text(json.dumps({"attempts": [attempt, {**attempt, "label": "02-single", "arm": "single"}]}))
+            record = loop_facts.main(results, results / "loops.json", [])
+        self.assertEqual(list(record["luna-xhigh-t-v1"]), ["01-loop"])
+
+
 class WalltimeTests(unittest.TestCase):
     def test_minutes_run_from_submission_to_the_snapshot_after_each_build(self):
         sys.path.insert(0, str(ROOT / "scripts"))

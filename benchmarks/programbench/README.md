@@ -305,7 +305,61 @@ score around its task's mean) and score and repeatability against model cost.
 
 ### Checker session
 
-Not run yet. The experiments and the comparison are defined above; the commands are under Reproduce.
+A checker that keeps its session makes the loop cheaper and faster, and worse. Its rounds cost about
+half as much (median $0.07 against $0.14 per round; a check $0.02 against $0.05, a build $0.05
+against $0.08), so 44 rounds fit into Sol's budget on average instead of 30, the loops took a median
+of 94 minutes instead of 221, and the checker accepted 9 loops instead of 6. Yet at Sol's cost the
+loop scores lower on 19 of the 20 tasks, by 6.3 points on average (63.2% against 69.5% over the
+tasks; Sol's single workers 65.6%), and after all its rounds it is still at 63.2%, against the
+fresh-checker loop's 71.1%. It reaches Sol's mean score on 8 tasks instead of 18, for less than Sol's
+cost on 7 instead of 15, and at Sol's cost it is ahead of Sol's single worker on 6 tasks instead of
+15, never robustly. What the loop gains from a checker that starts every round without memory of
+the last one is worth more than the rounds that memory saves.
+
+| Task | Budget C | Sol single worker | Loop, fresh checker session | Loop, checker keeps its session | Rounds within C, fresh → kept | Cost to reach Sol's mean, fresh → kept |
+|---|---|---|---|---|---|---|
+| datasurgeon | $2.18 | 76.9% | 63.3% (52.8 to 75.1) | 64.7% (53.5 to 74.9) | 30 → 49 | not reached → not reached |
+| xz | $4.15 | 49.6% | 44.9% (43.4 to 46.4) | 43.5% (41.7 to 44.7) | 25 → 41 | not reached → not reached |
+| revive | $4.00 | 45.1% | 49.1% (46.6 to 51.5) | 47.5% (45.0 to 51.1) | 37 → 50 | 12% → 30% |
+| gdu | $3.79 | 80.2% | 83.7% (82.8 to 84.3) | 81.8% (80.2 to 83.7) | 31 → 50 | 48% → 45% |
+| marmite | $4.60 | 65.9% | 64.4% (62.8 to 66.1) | 62.3% (61.1 to 63.2) | 26 → 43 | 173% → not reached |
+| crowbook | $4.03 | 65.3% | 67.3% (63.4 to 70.4) | 64.7% (59.2 to 69.4) | 18 → 34 | 90% → 128% |
+| dust | $3.96 | 73.4% | 76.6% (75.2 to 77.6) | 72.6% (69.7 to 75.2) | 30 → 43 | 66% → not reached |
+| calcurse | $4.41 | 70.6% | 80.5% (76.8 to 85.4) | 75.9% (72.6 to 79.1) | 37 → 43 | 39% → 34% |
+| tree-sitter | $4.03 | 40.7% | 45.5% (41.8 to 48.6) | 40.1% (39.1 to 41.9) | 25 → 48 | 31% → 62% |
+| svgbob | $3.75 | 55.9% | 53.5% (51.2 to 55.0) | 47.7% (45.6 to 50.0) | 25 → 37 | 193% → not reached |
+| keifu | $6.61 | 89.2% | 91.1% (89.8 to 92.6) | 85.0% (82.0 to 88.0) | 43 → 47 | 44% → not reached |
+| direnv | $6.05 | 76.8% | 87.4% (86.4 to 88.6) | 81.1% (77.2 to 84.4) | 33 → 50 | 39% → 53% |
+| parqeye | $6.96 | 76.1% | 89.2% (87.9 to 90.1) | 82.5% (78.9 to 86.6) | 40 → 43 | 50% → 29% |
+| fasttext | $2.88 | 76.9% | 78.4% (74.5 to 82.0) | 71.3% (62.1 to 78.6) | 18 → 50 | 80% → not reached |
+| ascii-image-converter | $5.04 | 86.6% | 84.4% (80.1 to 87.7) | 77.2% (71.9 to 82.2) | 30 → 42 | 130% → not reached |
+| igrep | $3.74 | 83.0% | 84.1% (81.8 to 85.8) | 76.3% (69.3 to 83.6) | 34 → 50 | 88% → not reached |
+| gittype | $4.76 | 71.5% | 76.0% (74.7 to 78.0) | 67.8% (60.7 to 72.9) | 41 → 45 | 20% → not reached |
+| dstask | $4.90 | 78.6% | 89.2% (88.4 to 90.1) | 75.2% (67.5 to 81.6) | 38 → 45 | 29% → not reached |
+| samtools | $3.47 | 31.5% | 35.3% (33.7 to 36.9) | 18.5% (12.1 to 28.0) | 15 → 38 | 65% → not reached |
+| ditaa | $4.66 | 17.7% | 46.6% (42.5 to 50.0) | 28.0% (14.2 to 38.3) | 26 → 34 | 7% → 5% |
+
+![With a checker that keeps its session, the loop scores higher at Sol's cost on 1 of 20 sampled ProgramBench tasks and lower on 19: GPT-5.6 Sol's single worker and GPT-5.6 Luna's loop with a fresh and with a kept checker session at Sol's cost, means of 5 runs with 95% bootstrap intervals](figures/checker-session-equal-cost.png)
+
+![The loop reaches Sol's score for 58% of Sol's cost with a fresh checker session every round, not reached with a kept session (medians over 20 sampled ProgramBench tasks): per task, each loop's cost to reach Sol's mean score as a share of Sol's cost](figures/checker-session-equal-score.png)
+
+- Every run entered the comparisons but direnv's loop run 04, whose parity workspace was scored on
+  850 tests instead of 849 (as the fresh loop's run 02 in the prompt study).
+- samtools and xz are recorded from their final workspaces (samtools 9.8% to 36.4%, mean 18.9%,
+  against Sol's 31.5%; xz 40.1% to 44.8% against 49.6%). For samtools, the builds up to round 8 were
+  scored as well and no budget among them reaches Sol's mean; xz's intermediate builds were not
+  scored.
+- Wall clock (task means): the loop reached Sol's budget after 0.8 to 2.6 hours (median 1.5) instead
+  of 1.5 to 4.9 (median 2.3). On the 8 tasks where both loops reach Sol's score, they take about the
+  same time to get there (medians 55 and 56 minutes).
+- Model cost of the 100 kept-session loops, all rounds: $368, against $693 for the fresh-checker
+  loops.
+
+Per-task results: `figures/checker-session/<loop>.json` (from `bench parity`) and `<loop>.match.json`
+(from `bench match`); both loop variants' rounds, acceptances, wall clock and costs per run in
+`figures/checker-session/loops.json` (`scripts/loop_facts.py`); the wall clock to the compared builds
+in `figures/checker-session/walltime.json` (`scripts/walltime.py`); figures:
+`scripts/plot_checker_session.py figures/checker-session/luna-xhigh-*-checker-resumed.json`.
 
 ## Reproduce
 
@@ -379,9 +433,13 @@ test containers).
    cp results/luna-xhigh-svgbob-v1/parity/sol-xhigh-svgbob-single.match.json figures/cost-parity/luna-xhigh-svgbob-v1.match.json
    cp results/luna-xhigh-svgbob-v1/parity/luna-xhigh-svgbob-prompt.json figures/prompt-study/luna-xhigh-svgbob-v1.json
    cp results/luna-xhigh-svgbob-v1/parity/luna-xhigh-svgbob-prompt.match.json figures/prompt-study/luna-xhigh-svgbob-v1.match.json
+   cp results/luna-xhigh-svgbob-checker-resumed/parity/sol-xhigh-svgbob-single.json figures/checker-session/luna-xhigh-svgbob-checker-resumed.json
+   cp results/luna-xhigh-svgbob-checker-resumed/parity/sol-xhigh-svgbob-single.match.json figures/checker-session/luna-xhigh-svgbob-checker-resumed.match.json
    python3 scripts/walltime.py results figures/cost-parity/walltime.json
+   python3 scripts/loop_facts.py results figures/checker-session/loops.json
    python3 scripts/plot_parity.py figures/cost-parity/*.json
    python3 scripts/plot_prompt_study.py figures/prompt-study/*.json
+   python3 scripts/plot_checker_session.py figures/checker-session/luna-xhigh-*-checker-resumed.json
    ```
 
    The plotting scripts need matplotlib; they fetch the fonts once from Google Fonts and fall back
