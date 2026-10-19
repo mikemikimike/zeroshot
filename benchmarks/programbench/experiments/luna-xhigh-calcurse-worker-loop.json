@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-calcurse-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on calcurse (a terminal calendar and scheduling application, written in C): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-calcurse-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-calcurse-v1 through the single GPT-5.6 Sol workers of sol-xhigh-calcurse-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on calcurse (a terminal calendar and scheduling application, written in C): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-calcurse-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-calcurse-v1 through the single GPT-5.6 Sol workers of sol-xhigh-calcurse-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "lfos__calcurse.49180d5",
     "image": "programbench/lfos_1776_calcurse.49180d5:task_cleanroom_v6@sha256:26d810389a6d5b155bb6d6799beaee6a836ee8a52d29c9a5089793ac1d22c79d",
@@ -17,6 +17,9 @@
   "model": {
     "id": "gpt-5.6-luna",
     "effort": "xhigh"
+  },
+  "prompts": {
+    "feedback": "Continue."
   },
   "arms": {
     "loop": {

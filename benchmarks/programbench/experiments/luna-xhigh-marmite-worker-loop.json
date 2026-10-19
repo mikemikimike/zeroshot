@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-marmite-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on marmite (static site generator that builds blogs from Markdown files, written in Rust): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-marmite-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-marmite-v1 through the single GPT-5.6 Sol workers of sol-xhigh-marmite-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on marmite (static site generator that builds blogs from Markdown files, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-marmite-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-marmite-v1 through the single GPT-5.6 Sol workers of sol-xhigh-marmite-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "rochacbruno__marmite.7d4bc2d",
     "image": "programbench/rochacbruno_1776_marmite.7d4bc2d:task_cleanroom_v6@sha256:d2c7d3ae64ac07093c860c46dec5e0731bd57dc724d4649c105c273ae8c64210",
@@ -17,6 +17,9 @@
   "model": {
     "id": "gpt-5.6-luna",
     "effort": "xhigh"
+  },
+  "prompts": {
+    "feedback": "Continue."
   },
   "arms": {
     "loop": {

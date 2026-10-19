@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-direnv-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on direnv (automatically loads and unloads environment variables per directory, written in Go): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-direnv-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-direnv-v1 through the single GPT-5.6 Sol workers of sol-xhigh-direnv-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on direnv (automatically loads and unloads environment variables per directory, written in Go): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-direnv-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-direnv-v1 through the single GPT-5.6 Sol workers of sol-xhigh-direnv-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "direnv__direnv.02040c7",
     "image": "programbench/direnv_1776_direnv.02040c7:task_cleanroom_v6@sha256:4d09c2e134f891a12f43de5f6be0246c9b3ea0516da303b7825584e37246dd48",
@@ -17,6 +17,9 @@
   "model": {
     "id": "gpt-5.6-luna",
     "effort": "xhigh"
+  },
+  "prompts": {
+    "feedback": "Continue."
   },
   "arms": {
     "loop": {

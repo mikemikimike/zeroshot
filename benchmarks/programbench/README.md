@@ -19,7 +19,7 @@ independent checker whose rejection becomes the builder's feedback for the next 
    with a checker that keeps its session across rounds, so it remembers what it rejected and the fixes
    it asked for.
 4. **Worker only.** Is it the checker, or just more rounds? The loop runs without its checker: the
-   builder alone, re-prompted in its own session round after round until Sol's budget is spent.
+   builder alone, told "Continue." in its own session round after round until Sol's budget is spent.
 
 Twenty tasks, 5 runs per arm per task. Every task is reported; there is no pooled test across tasks.
 
@@ -152,10 +152,10 @@ so the checker resumes its own session every round, as the builder does, instead
 The graph, the prompts, the input and every limit are byte-identical to the loop's.
 
 The worker-only experiments (`arms.loop.worker_only`) are the loop with its check node removed: the
-build node runs up to 50 times in its own session, and since nothing writes the feedback, every round
-re-prompts the builder with the task and empty feedback, which is Zeroshot's way of telling a resumed
-session to carry on. Round 1 is byte-identical to the single worker's build; the prompt, the input,
-the limits and the prices are the loop's.
+build node runs up to 50 times in its own session, and every round re-prompts the builder with the
+task and the feedback the run started with, `prompts.feedback`, which is "Continue." (the graph
+writes no feedback of its own). The prompt, the limits and the prices are the loop's; round 1
+differs from the single worker's build by that one word of feedback.
 
 ## Comparisons
 

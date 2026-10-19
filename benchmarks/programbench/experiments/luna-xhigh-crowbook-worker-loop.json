@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-crowbook-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on crowbook (converts Markdown books to HTML, LaTeX, PDF, and EPUB formats, written in Rust): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-crowbook-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-crowbook-v1 through the single GPT-5.6 Sol workers of sol-xhigh-crowbook-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on crowbook (converts Markdown books to HTML, LaTeX, PDF, and EPUB formats, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-crowbook-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-crowbook-v1 through the single GPT-5.6 Sol workers of sol-xhigh-crowbook-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "crowdagger__crowbook.ea214d7",
     "image": "programbench/crowdagger_1776_crowbook.ea214d7:task_cleanroom_v6@sha256:101ae969bc8831f9a8a1c20794a3f48ee6becaaca2669235ef9da9fc2fbd964b",
@@ -17,6 +17,9 @@
   "model": {
     "id": "gpt-5.6-luna",
     "effort": "xhigh"
+  },
+  "prompts": {
+    "feedback": "Continue."
   },
   "arms": {
     "loop": {

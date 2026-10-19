@@ -124,10 +124,13 @@ def run_files(exp: Experiment, arm: str) -> dict[str, Any]:
         graph = graphs.loop_graph(builder, checker, exp.max_iterations, limits["build_timeout_ms"], limits["check_timeout_ms"])
     else:
         graph = graphs.single_graph(builder, limits["build_timeout_ms"])
+    run_input: dict[str, str] = {"task": task_statement(exp)}
+    if arm == "loop" and exp.worker_only:
+        run_input["feedback"] = exp.feedback or ""
     return {
         "graph.json": graph,
         "runtime.json": graphs.runtime_plan(arm, exp.model, exp.effort, exp.check_session_scope, exp.worker_only),
-        "input.json": {"task": task_statement(exp)},
+        "input.json": run_input,
     }
 
 

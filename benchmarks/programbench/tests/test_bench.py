@@ -110,7 +110,8 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(loop["body"]["children"][0], plain["graph.json"]["root"]["children"][0]["body"]["children"][0])  # the same build node
         self.assertEqual((loop["until"], loop["maxIterations"]), (None, 50))
         self.assertEqual(files["graph.json"]["root"]["children"][1], {"kind": "fail", "name": "unverified", "reason": "unverified"})
-        self.assertEqual(files["input.json"], plain["input.json"])
+        self.assertEqual(files["input.json"], {**plain["input.json"], "feedback": "Continue."})
+        self.assertEqual(files["graph.json"]["initialInput"], {"kind": "record", "fields": {"feedback": {"type": {"kind": "string"}, "required": True}, "task": {"type": {"kind": "string"}, "required": True}}})
         self.assertEqual(files["runtime.json"], {**plain["runtime.json"], "nodes": {"build": plain["runtime.json"]["nodes"]["build"]}})
 
     def test_runtime_sessions(self):
@@ -281,18 +282,20 @@ class ConfigTests(unittest.TestCase):
             exp = config.load(path)
             loop = config.load(f"experiments/{exp.id.removesuffix('-worker-loop')}-v1.json")
             self.assertTrue(exp.worker_only and not loop.worker_only)
-            self.assertEqual(set(exp.raw), EXPERIMENT_KEYS)
+            self.assertEqual((set(exp.raw), exp.raw["prompts"], exp.feedback), (EXPERIMENT_KEYS | {"prompts"}, {"feedback": "Continue."}, "Continue."))
             for key in ("task", "model", "order", "limits", "resources", "eval", "pricing"):
                 self.assertEqual(exp.raw[key], loop.raw[key], key)
             self.assertEqual(exp.raw["arms"], {"loop": {**loop.raw["arms"]["loop"], "worker_only": True}})
-            self.assertEqual(run_files(exp, "loop")["input.json"], run_files(loop, "loop")["input.json"])
+            self.assertEqual(run_files(exp, "loop")["input.json"], {**run_files(loop, "loop")["input.json"], "feedback": "Continue."})
             self.assertIn(loop.id, exp.raw["description"])
         smoke, plain = config.load("experiments/smoke-svgbob-worker-loop.json"), config.load("experiments/smoke-svgbob.json")
         self.assertTrue(smoke.worker_only)
-        self.assertEqual({k: v for k, v in smoke.raw.items() if k not in ("id", "description", "arms")}, {k: v for k, v in plain.raw.items() if k not in ("id", "description", "arms")})
+        self.assertEqual({k: v for k, v in smoke.raw.items() if k not in ("id", "description", "arms", "prompts")}, {k: v for k, v in plain.raw.items() if k not in ("id", "description", "arms")})
         raw = EXPERIMENT.raw
         for bad in ({**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": "yes"}}},
-                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True, "check_session_scope": "node_instance"}}}):
+                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True, "check_session_scope": "node_instance"}}},
+                    {**raw, "prompts": {"feedback": "Continue."}},  # feedback without a worker-only loop
+                    {**raw, "arms": {"loop": {**raw["arms"]["loop"], "worker_only": True}}, "prompts": {"feedback": " "}}):
             with self.assertRaises(ValueError, msg=bad):
                 self._load(bad)
 

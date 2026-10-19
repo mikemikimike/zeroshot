@@ -1,6 +1,6 @@
 {
   "id": "luna-xhigh-svgbob-worker-loop",
-  "description": "GPT-5.6 Luna's loop without its checker at xhigh on svgbob (ASCII diagrams to SVG, written in Rust): the build node alone, re-run in its own session with the task and empty feedback, up to 50 rounds; otherwise luna-xhigh-svgbob-v1's prompt, limits, resources, evaluation and prices, and round 1 byte-identical to it: 5 runs. Compared with luna-xhigh-svgbob-v1 through the single GPT-5.6 Sol workers of sol-xhigh-svgbob-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
+  "description": "GPT-5.6 Luna's loop without its checker at xhigh on svgbob (ASCII diagrams to SVG, written in Rust): the build node alone, re-run in its own session with the task and the feedback \"Continue.\" every round, up to 50 rounds; otherwise luna-xhigh-svgbob-v1's prompt, limits, resources, evaluation and prices, with round 1 differing from its build 1 by that feedback alone: 5 runs. Compared with luna-xhigh-svgbob-v1 through the single GPT-5.6 Sol workers of sol-xhigh-svgbob-single: both at the workers' mean model cost (bench parity) and their costs to reach the workers' mean score (bench match).",
   "task": {
     "instance_id": "ivanceras__svgbob.6d00ad9",
     "image": "programbench/ivanceras_1776_svgbob.6d00ad9:task_cleanroom_v6@sha256:8656583769698b008c6ca1b02ca7da4207a4a3c7dc2d8105d82dc6ae0a2a6f67",
@@ -39,6 +39,9 @@
   "model": {
     "id": "gpt-5.6-luna",
     "effort": "xhigh"
+  },
+  "prompts": {
+    "feedback": "Continue."
   },
   "arms": {
     "loop": {

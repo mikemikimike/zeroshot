@@ -63,10 +63,10 @@ def check_node(instructions: str, timeout_ms: int) -> dict[str, Any]:
     }
 
 
-def _graph(root: dict[str, Any]) -> dict[str, Any]:
+def _graph(root: dict[str, Any], *inputs: str) -> dict[str, Any]:
     return {
         "profile": "openengine.graph.full/v1",
-        "initialInput": _record("task"),
+        "initialInput": _record(*(inputs or ("task",))),
         "policy": {"policy": "policy.native-v2@1", "default": "deny"},
         "root": root,
     }
@@ -149,9 +149,9 @@ def loop_graph(builder: str, checker: str, max_iterations: int, build_timeout_ms
 
 def worker_loop_graph(builder: str, max_iterations: int, build_timeout_ms: int) -> dict[str, Any]:
     """The loop without its checker: ``build`` runs ``max_iterations`` times in the builder's own session.
-    Nothing writes ``feedback``, so every round re-prompts the builder with the task and empty feedback
-    (round 1 is byte-identical to the single arm's build). The run ends ``unverified``; the final
-    workspace is what gets scored."""
+    Nothing writes ``feedback``, so every round re-prompts the builder with the task and the feedback the
+    run started with (its input carries it). The run ends ``unverified``; the final workspace is what
+    gets scored."""
     state = _record("feedback", "task")
     return _graph(
         {
@@ -177,7 +177,8 @@ def worker_loop_graph(builder: str, max_iterations: int, build_timeout_ms: int) 
                 {"kind": "fail", "name": "unverified", "reason": "unverified"},
             ],
             "promotedStatePaths": [],
-        }
+        },
+        "feedback", "task",
     )
 
 

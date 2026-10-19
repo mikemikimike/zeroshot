@@ -118,6 +118,11 @@ class Experiment:
         return bool(self.raw["arms"].get("loop", {}).get("worker_only", False))
 
     @property
+    def feedback(self) -> str | None:
+        """The feedback a worker-only loop's builder receives in every round (the graph writes none)."""
+        return self.raw.get("prompts", {}).get("feedback")
+
+    @property
     def check_session_scope(self) -> str:
         """``execution`` (a fresh checker session every round) or ``node_instance`` (one session kept
         across the loop's rounds); the runtime plan's ``sessionScope`` for the check node."""
@@ -199,8 +204,11 @@ def _validate(raw: dict[str, Any]) -> None:
             raise ValueError(f"eval.{key} is required")
     arms = raw["arms"]
     prompts = raw.get("prompts", {})
-    if set(prompts) - {"build"} or prompts.get("build", "builder") not in BUILD_PROMPTS or (prompts.get("build", "builder") != "builder" and "loop" in arms):
+    if set(prompts) - {"build", "feedback"} or prompts.get("build", "builder") not in BUILD_PROMPTS or (prompts.get("build", "builder") != "builder" and "loop" in arms):
         raise ValueError(f"prompts.build must be one of {BUILD_PROMPTS}, and only a single-arm experiment may change it")
+    worker_only = bool(arms.get("loop", {}).get("worker_only", False))
+    if "feedback" in prompts and (not worker_only or not isinstance(prompts["feedback"], str) or not prompts["feedback"].strip()):
+        raise ValueError("prompts.feedback is the text a worker-only loop's builder receives every round, and needs such a loop")
     if set(arms) - set(ARMS):
         raise ValueError(f"unknown arms: {set(arms) - set(ARMS)}")
     if "loop" in arms and (set(arms["loop"]) - {"repeats", "max_iterations", "check_session_scope", "worker_only"} or arms["loop"].get("check_session_scope", "execution") not in CHECK_SESSION_SCOPES):
