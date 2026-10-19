@@ -1097,6 +1097,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#zeroshot.FailureContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FailureContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zeroshot.FailureDiagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FailureDiagnostic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#zeroshot.LogEvent" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1862,6 +1884,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#zeroshot.FailureContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FailureContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zeroshot.FailureDiagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FailureDiagnostic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#zeroshot.LogEvent" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2110,6 +2154,184 @@
           –
           <div class="doc-md-description">
             <p>Executable graph node name.</p>
+          </div>
+        </li>
+    </ul>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="zeroshot.FailureContext" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>              <code class="highlight language-python"><span class="n">FailureContext</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">primary</span><span class="p">:</span> <span class="n">FailureDiagnostic</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">recorded</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FailureDiagnostic</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span> <span class="n">incomplete</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#zeroshot.FailureContext" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Recorded failure evidence without inferring causality from log order.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>primary</code></b>
+              (<code><a class="autorefs autorefs-internal" title="              FailureDiagnostic(*, message: str, execution: ActiveExecution | None = None, cursor: str | None = None)
+
+  
+      dataclass
+   (zeroshot.runs.FailureDiagnostic)" href="#zeroshot.FailureDiagnostic">FailureDiagnostic</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Explicitly identified runtime failure, when available.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>recorded</code></b>
+              (<code><span title="tuple">tuple</span>[<a class="autorefs autorefs-internal" title="              FailureDiagnostic(*, message: str, execution: ActiveExecution | None = None, cursor: str | None = None)
+
+  
+      dataclass
+   (zeroshot.runs.FailureDiagnostic)" href="#zeroshot.FailureDiagnostic">FailureDiagnostic</a>, ...]</code>, default:
+                  <code>()</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Recent failure records, which may include recovered or voided attempts.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>incomplete</code></b>
+              (<code><span title="bool">bool</span></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Whether additional failure evidence may be missing from this summary.</p>
+          </div>
+        </li>
+    </ul>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="zeroshot.FailureDiagnostic" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>              <code class="highlight language-python"><span class="n">FailureDiagnostic</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">execution</span><span class="p">:</span> <span class="n">ActiveExecution</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cursor</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#zeroshot.FailureDiagnostic" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>One producer-redacted failure record retained with the run.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>message</code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Bounded secret-safe explanation.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>execution</code></b>
+              (<code><a class="autorefs autorefs-internal" title="              ActiveExecution(*, execution: str, node: str)
+
+  
+      dataclass
+   (zeroshot.runs.ActiveExecution)" href="#zeroshot.ActiveExecution">ActiveExecution</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Associated executable graph node, or None for a run-wide record.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>cursor</code></b>
+              (<code><span title="str">str</span> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Cursor of the original diagnostic log, when durably recorded.</p>
           </div>
         </li>
     </ul>
@@ -2759,7 +2981,7 @@ and seven days after readiness.</p>
 
 
 <h2 id="zeroshot.RunResult" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>              <code class="highlight language-python"><span class="n">RunResult</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">run_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">succeeded</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">JsonValue</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">failure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>              <code class="highlight language-python"><span class="n">RunResult</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">run_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">succeeded</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">JsonValue</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">failure</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">FailureContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -2815,6 +3037,20 @@ and seven days after readiness.</p>
           –
           <div class="doc-md-description">
             <p>Stable nonempty failure reason when succeeded is false.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>context</code></b>
+              (<code><a class="autorefs autorefs-internal" title="              FailureContext(*, primary: FailureDiagnostic | None = None, recorded: tuple[FailureDiagnostic, ...] = (), incomplete: bool = False)
+
+  
+      dataclass
+   (zeroshot.runs.FailureContext)" href="#zeroshot.FailureContext">FailureContext</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Structured safe failure evidence, or None for older run data.</p>
           </div>
         </li>
     </ul>
@@ -2957,7 +3193,7 @@ and seven days after readiness.</p>
         </li>
         <li class="doc-section-item field-body">
             <b><code>result</code></b>
-              (<code><a class="autorefs autorefs-internal" title="              RunResult(*, run_id: str, succeeded: bool, output: JsonValue = None, failure: str | None = None)
+              (<code><a class="autorefs autorefs-internal" title="              RunResult(*, run_id: str, succeeded: bool, output: JsonValue = None, failure: str | None = None, context: FailureContext | None = None)
 
   
       dataclass
@@ -3212,7 +3448,7 @@ and seven days after readiness.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    Last updated <time datetime="2026-10-18">18 October 2026</time>
+    Last updated <time datetime="2026-10-19">19 October 2026</time>
   </span>
 
     
