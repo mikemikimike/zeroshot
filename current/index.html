@@ -1796,8 +1796,9 @@ Authored edges then route review, retries, and the final result.</p>
 <p><a class="docs-graph-wide" href="assets/zeroshot-workflow.svg"><img alt="Zeroshot built-in workflow: implementation, parallel independent acceptance and code review, bounded repair, optional Git delivery, and delivery repair returning to both reviews." loading="lazy" src="assets/zeroshot-workflow.svg" /></a></p>
 <p><a class="docs-graph-tall" href="assets/zeroshot-workflow-mobile.svg"><img alt="Zeroshot built-in workflow: implementation, parallel independent acceptance and code review, bounded repair, optional Git delivery, and delivery repair returning to both reviews." loading="lazy" src="assets/zeroshot-workflow-mobile.svg" /></a></p>
 <p>The built-in <code>software-change</code> template uses the route shown above. For work that does not need its
-review loop, use <code>single-worker</code>. For ten rounds of measured, reversible research against a durable
-charter, use <code>auto-research</code>; custom graphs follow the same protocol contracts.</p>
+review loop, use <code>single-worker</code>. For research, use <code>auto-research</code>. It runs ten rounds of experiments
+by default, and a new result replaces the current one only when the progress judge accepts it. Custom
+graphs follow the same protocol contracts.</p>
 <h2 id="choose-where-it-runs">Choose where it runs<a class="headerlink" href="#choose-where-it-runs" title="Permanent link">&para;</a></h2>
 <!-- prettier-ignore-start -->
 
