@@ -42,6 +42,7 @@ const MAX_GIT_OUTPUT_BYTES: usize = 16 * 1024;
 
 mod source;
 use source::resolved_git_source;
+pub(crate) use source::validate_remote_base_branch;
 mod workspace;
 pub(crate) use workspace::validate_workspace_state;
 use workspace::resolve_workspace;
@@ -64,6 +65,16 @@ pub enum LocalCompositionError {
     AmbiguousRemote,
     #[error("Git delivery requires a committed repository source")]
     DeliverySourceRequired,
+    #[error(
+        "remote does not have target branch `{branch}`; set the intended upstream (for example `git branch --set-upstream-to=origin/main`) or create the worktree from `origin/main`"
+    )]
+    MissingRemoteBase { branch: String },
+    #[error(
+        "could not verify target branch `{branch}` on the remote; check remote connectivity and credentials"
+    )]
+    RemoteBaseCheck { branch: String },
+    #[error("Git delivery credentials are invalid")]
+    DeliveryCredentials,
     #[error("current Git resolved source is invalid")]
     ResolvedSource,
     #[error("local run identity could not be assigned")]

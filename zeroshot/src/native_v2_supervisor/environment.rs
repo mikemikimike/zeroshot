@@ -275,7 +275,7 @@ impl RunEnvironment {
             .ok_or(RunEnvironmentError::MissingConnection(key))
     }
 
-    pub(super) async fn resolve(
+    pub(crate) async fn resolve(
         &self,
         binding: &NodeRuntimeBinding,
     ) -> Result<ResolvedEnvironment, RunEnvironmentError> {

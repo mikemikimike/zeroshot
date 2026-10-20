@@ -87,6 +87,13 @@ stops without merging. `--ship` uses the same feedback loop before it follows th
 policy and confirms the merged revision. Missing approval doesn't block `--pr`; it still blocks
 `--ship` when GitHub requires it.
 
+For local `--pr` and `--ship` runs, the target branch is the current branch's upstream when one is
+configured; otherwise, Zeroshot uses the local branch name. Preparation verifies that the selected
+remote contains this target before agent execution. To target `main` from a fresh worktree,
+run `git branch --set-upstream-to=origin/main`, or create the worktree from `origin/main` so Git
+sets the tracking branch automatically. If the remote cannot be reached or authenticated,
+preparation reports that the target branch could not be verified.
+
 `auto-research` runs ten iterations by default. Optional run input `options.iterations` selects a
 positive count that becomes the loop bound at admission, subject to the engine's general per-run
 resource budgets. A single planner compares directions using the durable backlog archive and

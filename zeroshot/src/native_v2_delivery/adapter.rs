@@ -383,11 +383,7 @@ impl<'a> DeliveryCredentials<'a> {
         };
         let refreshed = crate::native_v2_runner::refresh_environment(environment).await?;
         self.refresh_forge_token(&refreshed)?;
-        let refreshed_git = match refreshed.source_git_credentials() {
-            Some(credentials) => Some(credentials.clone()),
-            None => git_credentials(&refreshed)
-                .map_err(|_| crate::native_v2_runner::EnvironmentRefreshError::InvalidResponse)?,
-        };
+        let refreshed_git = resolved_git_credentials(&refreshed, None)?;
         if let Some(git) = refreshed_git {
             self.git = Some(git);
         }
@@ -543,19 +539,18 @@ impl NativeV2DeliveryAdapter {
                 .to_owned(),
             None => String::new(),
         };
-        let github_git_token = forge_credential(&invocation.environment, GITHUB_TOKEN_ENV)
-            .or(self.trusted_github_token.as_deref())
-            .unwrap_or("")
-            .to_owned();
-        let git = invocation
-            .environment
-            .source_git_credentials()
-            .cloned()
-            .or(self.trusted_git_credentials.clone());
-        let git = match git {
-            Some(credentials) => Some(credentials),
-            None => git_credentials(&invocation.environment)?,
-        };
+        let github_git_token = github_git_token(
+            &invocation.environment,
+            self.trusted_github_token.as_deref(),
+        )
+        .map_err(refresh_failure)?
+        .unwrap_or("")
+        .to_owned();
+        let git = resolved_git_credentials(
+            &invocation.environment,
+            self.trusted_git_credentials.as_ref(),
+        )
+        .map_err(|_| DeliveryStop::Outcome(WorkerOutcome::malformed()))?;
         Ok(DeliveryCredentials {
             environment: Some(&invocation.environment),
             token_file,
@@ -572,18 +567,12 @@ impl NativeV2DeliveryAdapter {
         environment: &ResolvedEnvironment,
         forge_field: Option<&str>,
     ) -> Result<Option<&'a TrustedGitHubTokenFile>, DeliveryStop> {
-        let name = EnvironmentVariableName::new(GITHUB_TOKEN_ENV)
-            .map_err(|_| DeliveryStop::Outcome(WorkerOutcome::malformed()))?;
         match (
-            environment
-                .get(&name)
-                .or(self.trusted_github_token.as_deref()),
+            github_git_token(environment, self.trusted_github_token.as_deref())
+                .map_err(refresh_failure)?,
             forge_field,
         ) {
-            (Some(token), _) => {
-                validate_github_delivery_token(token).map_err(refresh_failure)?;
-                Ok(None)
-            }
+            (Some(_), _) => Ok(None),
             (None, Some(GITHUB_TOKEN_ENV)) => Ok(self.trusted_github_token_file.as_ref()),
             _ => Ok(None),
         }
@@ -1144,26 +1133,4 @@ fn feedback_diagnostic(items: &[SourceReviewFeedbackItem]) -> Option<String> {
         }
     }
     Some(diagnostic)
-}
-
-fn git_credentials(
-    environment: &ResolvedEnvironment,
-) -> Result<Option<openengine_cluster_protocol::GitTransportCredentials>, DeliveryStop> {
-    let values: BTreeMap<_, _> = environment
-        .iter()
-        .filter(|(name, _)| {
-            matches!(
-                name.as_str(),
-                "GIT_USERNAME" | "GIT_PASSWORD" | "GIT_SSH_PRIVATE_KEY" | "GIT_SSH_KNOWN_HOSTS"
-            )
-        })
-        .map(|(name, value)| (name.clone(), value.to_owned()))
-        .collect();
-    if values.is_empty() {
-        return Ok(None);
-    }
-    let values = openengine_cluster_protocol::StaticConnectionValues::new(values)
-        .map_err(|_| DeliveryStop::Outcome(WorkerOutcome::malformed()))?;
-    openengine_cluster_protocol::GitTransportCredentials::from_connection_values(&values)
-        .map_err(|_| DeliveryStop::Outcome(WorkerOutcome::malformed()))
 }

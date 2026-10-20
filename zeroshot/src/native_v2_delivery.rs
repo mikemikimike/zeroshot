@@ -284,6 +284,63 @@ fn forge_credential<'a>(environment: &'a ResolvedEnvironment, field: &str) -> Op
     (!token.trim().is_empty() && token.len() <= MAX_TOKEN_BYTES).then_some(token)
 }
 
+/// Selects and validates the declared GitHub Git token before trusted local authority.
+pub(crate) fn github_git_token<'a>(
+    environment: &'a ResolvedEnvironment,
+    trusted: Option<&'a str>,
+) -> Result<Option<&'a str>, crate::native_v2_runner::EnvironmentRefreshError> {
+    let name = EnvironmentVariableName::new(GITHUB_TOKEN_ENV)
+        .map_err(|_| crate::native_v2_runner::EnvironmentRefreshError::InvalidResponse)?;
+    environment
+        .get(&name)
+        .or(trusted)
+        .map(|token| {
+            validate_github_delivery_token(token)?;
+            Ok(token)
+        })
+        .transpose()
+}
+
+/// Source-only credentials outrank trusted host credentials and fields on the delivery binding.
+pub(crate) fn resolved_git_credentials(
+    environment: &ResolvedEnvironment,
+    trusted: Option<&openengine_cluster_protocol::GitTransportCredentials>,
+) -> Result<
+    Option<openengine_cluster_protocol::GitTransportCredentials>,
+    crate::native_v2_runner::EnvironmentRefreshError,
+> {
+    if let Some(credentials) = environment.source_git_credentials().or(trusted) {
+        return Ok(Some(credentials.clone()));
+    }
+    git_credentials(environment)
+}
+
+fn git_credentials(
+    environment: &ResolvedEnvironment,
+) -> Result<
+    Option<openengine_cluster_protocol::GitTransportCredentials>,
+    crate::native_v2_runner::EnvironmentRefreshError,
+> {
+    use crate::native_v2_runner::EnvironmentRefreshError;
+    let values: BTreeMap<_, _> = environment
+        .iter()
+        .filter(|(name, _)| {
+            matches!(
+                name.as_str(),
+                "GIT_USERNAME" | "GIT_PASSWORD" | "GIT_SSH_PRIVATE_KEY" | "GIT_SSH_KNOWN_HOSTS"
+            )
+        })
+        .map(|(name, value)| (name.clone(), value.to_owned()))
+        .collect();
+    if values.is_empty() {
+        return Ok(None);
+    }
+    let values = openengine_cluster_protocol::StaticConnectionValues::new(values)
+        .map_err(|_| EnvironmentRefreshError::InvalidResponse)?;
+    openengine_cluster_protocol::GitTransportCredentials::from_connection_values(&values)
+        .map_err(|_| EnvironmentRefreshError::InvalidResponse)
+}
+
 struct DeliveryResult<'a> {
     mode: DeliveryMode,
     outcome: &'a str,

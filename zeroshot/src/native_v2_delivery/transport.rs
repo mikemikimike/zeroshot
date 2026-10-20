@@ -346,6 +346,10 @@ impl GitTransport {
         );
         if let Some(environment) = &self.config.local_environment {
             command.envs(environment);
+            if self.config.identity.is_none() {
+                // Resolve native relative PATH entries in the selected workspace.
+                command.current_dir(&self.config.workspace);
+            }
             for variable in ["GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL"] {
                 if !environment.contains_key(variable) {
                     command.env_remove(variable);

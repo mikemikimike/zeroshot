@@ -203,17 +203,39 @@ impl LocalCliBackend {
             .validate_intent(&request.intent, DeliveryPolicy::Optional)
             .await
             .map_err(NativeV2CliError::InvalidRun)?;
+
         let prepared = self.prepare_run(request).await?;
         let digest = submission_digest(&prepared.submission).map_err(local_error)?;
-        let _submission_lock = self.acquire_submission_lock().await?;
-        if let Some(run_id) = self
-            .existing_submission(
+
+        let existing = || {
+            self.existing_submission(
                 &prepared.submission.submission_key,
                 &digest,
                 &prepared.workspace,
             )
-            .await?
+        };
+        if crate::native_v2_admission::delivery_capabilities(&prepared.submission.graph.root)
+            .contains(&crate::source_code_provider::SourceCapability::PullRequest)
         {
+            {
+                let _submission_lock = self.acquire_submission_lock().await?;
+                if let Some(run_id) = existing().await? {
+                    return Ok(run_id);
+                }
+            }
+            // Remote I/O must not hold the shared submission lock.
+            crate::native_v2_local::validate_remote_base_branch(
+                &prepared,
+                &self.git_program,
+                &self.state_root,
+            )
+            .await
+            .map_err(|error| NativeV2CliError::Usage(error.to_string()))?;
+        }
+
+        // A concurrent submitter may have accepted this request during remote validation.
+        let _submission_lock = self.acquire_submission_lock().await?;
+        if let Some(run_id) = existing().await? {
             return Ok(run_id);
         }
         self.start_prepared_controller(prepared).await
@@ -239,6 +261,7 @@ impl LocalCliBackend {
             RunEnvironment::exact_for_submission(&submission, request.connections.clone())?
                 .resolve_git_source()
                 .await?;
+
         request.cwd = Some(workspace);
         request.source = source.map(|resolved| super::NamedRunSource {
             resolved,

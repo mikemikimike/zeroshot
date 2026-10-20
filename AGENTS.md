@@ -162,6 +162,12 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   folders exclude each other while sibling folders remain concurrent. Lease guards explicitly
   unlock on drop so fork-before-exec children cannot retain released ownership. Git metadata and
   transport commands discard ambient repository-selection variables before inspecting the selected folder.
+- New local PR/merge submissions verify the remote target branch before controller startup,
+  after checking for an existing submission. Remote I/O stays outside the shared submission lock;
+  admission rechecks idempotency before launch. Preflight reuses the prepared native snapshot and
+  delivery binding's resolved credentials; native Git starts in the selected workspace so relative
+  search paths resolve consistently. Shared delivery credential helpers preserve declared
+  GitHub token precedence and source-only Git authority; forge API tokens remain provider-owned.
 - Git checkout and push use credential-free HTTPS or SSH locators independently of a forge.
   The target image includes OpenSSH and a fixed root-owned libnss_wrapper for pinned SSH
   transport. Contained SSH Git uses private per-command user/group records for allocated numeric

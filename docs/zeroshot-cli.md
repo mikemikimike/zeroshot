@@ -753,7 +753,7 @@ Commands:
 ```text
 Submit a graph run locally or to a named target.
 
-Local runs use --cwd or the invoking folder; Git worktrees use their root. Local Git delivery requires an attached, committed branch and an HTTPS/SSH remote. PR/merge also require a supported forge. Named targets require a committed Git source. Local workspaces must not overlap Zeroshot state.
+Local runs use --cwd or the invoking folder; Git worktrees use their root. Local Git delivery requires an attached, committed branch and an HTTPS/SSH remote. PR/merge also require a supported forge. Named targets require a committed Git source. Local workspaces must not overlap Zeroshot state. For local PR and merge delivery, the target is the branch's upstream when configured, otherwise the local branch name. Preparation verifies that the remote contains the target before agents start. To target `main` from a fresh worktree, run `git branch --set-upstream-to=origin/main`, or create the worktree from `origin/main`.
 
 A foreground run follows NDJSON events until completion. --detach returns after submission. Ctrl-C before the submission attempt begins cancels the command; once it begins, Ctrl-C waits for the receipt and then detaches. During observation, Ctrl-C detaches without stopping the run.
 

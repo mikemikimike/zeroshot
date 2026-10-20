@@ -223,6 +223,13 @@ no source connection is selected. Push does not require GitHub or its CLI. PR an
 require a registered forge adapter; GitHub is the maintained forge today. Other Git hosts can already
 use checkout and push.
 
+For local PR and merge delivery, the target branch is the current branch's upstream when configured;
+otherwise, Zeroshot uses the local branch name. Preparation verifies that the selected remote
+contains the target before agent execution. A fresh worktree may not have an upstream configured. To
+target `main`, run `git branch --set-upstream-to=origin/main` in the worktree, or create it from
+`origin/main` so Git configures the tracking branch. A missing branch is reported separately from a
+remote access or authentication failure.
+
 `--source-connection KEY` selects private transport authority without granting it to agent nodes.
 HTTPS connections declare `GIT_USERNAME` and `GIT_PASSWORD`; SSH connections declare
 `GIT_SSH_PRIVATE_KEY` and `GIT_SSH_KNOWN_HOSTS`. Explicit SSH authentication uses those pinned hosts

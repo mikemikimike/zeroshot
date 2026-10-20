@@ -140,6 +140,7 @@ impl DeliveryFixture {
             root,
         };
         fixture.write_fake_codex();
+        fixture.write_fake_git();
         fixture.initialize_repository();
         fixture
     }
@@ -181,6 +182,38 @@ impl DeliveryFixture {
             read(&self.gh_log),
             read(&self.codex_log)
         )
+    }
+    fn write_fake_git(&self) {
+        let real_git = host_executable("git");
+
+        openengine_cluster_testkit::fixture::write_executable(
+            &self.bin.join("git"),
+            format!(
+                r#"#!/bin/sh
+    is_ls_remote=false
+    requested_ref=
+
+    for argument in "$@"; do
+        if [ "$argument" = "ls-remote" ]; then
+            is_ls_remote=true
+        fi
+        case "$argument" in
+            refs/heads/*) requested_ref="$argument" ;;
+        esac
+    done
+
+    if [ "$is_ls_remote" = true ] && [ -n "$requested_ref" ]; then
+        printf '%s\t%s\n' '0123456789abcdef0123456789abcdef01234567' "$requested_ref"
+        exit 0
+    fi
+
+    exec '{real_git}' "$@"
+    "#,
+                real_git = real_git.display(),
+            ),
+            0o755,
+        )
+        .assert_value_with("write fake Git");
     }
 
     /// A GitHub CLI stand-in. Delivery clears its environment, so it logs to a fixed path.

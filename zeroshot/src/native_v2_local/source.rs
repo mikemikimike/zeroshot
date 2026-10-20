@@ -122,3 +122,73 @@ fn transport_repository(
         })
         .map_err(|_| LocalCompositionError::ResolvedSource)
 }
+
+/// Observes a new local PR/merge run's base using the same context and authority as delivery.
+pub(crate) async fn validate_remote_base_branch(
+    prepared: &super::PreparedLocalRun,
+    git_program: &Path,
+    state_root: &Path,
+) -> Result<(), LocalCompositionError> {
+    use crate::native_v2_delivery::{github_git_token, resolved_git_credentials, transport};
+    use crate::native_v2_contract::NodeRuntimeBinding;
+
+    let source = prepared
+        .submission
+        .source
+        .as_ref()
+        .ok_or(LocalCompositionError::DeliverySourceRequired)?;
+    let binding = prepared
+        .submission
+        .runtime
+        .nodes()
+        .values()
+        .find(|binding| matches!(binding, NodeRuntimeBinding::GitDelivery { .. }))
+        .ok_or(LocalCompositionError::DeliverySourceRequired)?;
+    let environment = prepared.environment.resolve(binding).await?;
+    let token = github_git_token(&environment, prepared.github_token.as_deref())
+        .map_err(|_| LocalCompositionError::DeliveryCredentials)?;
+    let credentials = resolved_git_credentials(&environment, prepared.git_credentials.as_ref())
+        .map_err(|_| LocalCompositionError::DeliveryCredentials)?;
+    let token_from_file = if token.is_none()
+        && credentials.is_none()
+        && crate::source_code_provider::adapters::core::delivery_uses_github_cli(
+            source,
+            &[crate::source_code_provider::SourceCapability::PullRequest],
+        ) {
+        prepared
+            .github_token_file
+            .as_ref()
+            .map(|file| file.read())
+            .transpose()
+            .map_err(|_| LocalCompositionError::GitHubTokenFile)?
+    } else {
+        None
+    };
+    let private_directory = state_root.join("git-preflight");
+    super::prepare_private_directory(&private_directory)?;
+    let transport = transport::GitTransport::new(
+        transport::GitTransportConfig {
+            git_program: git_program.to_owned(),
+            workspace: prepared.workspace.clone(),
+            home_directory: private_directory.clone(),
+            private_directory,
+            identity: None,
+            local_environment: Some(prepared.native_environment.clone()),
+            deadline: std::time::Duration::from_secs(10 * 60),
+        },
+        crate::source_code_provider::adapters::core::source_remote(source),
+    );
+    let credential = transport::source_credential(
+        token.or(token_from_file.as_deref()).unwrap_or(""),
+        credentials.as_ref(),
+    );
+    match transport.read_ref(source.branch.as_str(), credential).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(LocalCompositionError::MissingRemoteBase {
+            branch: source.branch.to_string(),
+        }),
+        Err(_) => Err(LocalCompositionError::RemoteBaseCheck {
+            branch: source.branch.to_string(),
+        }),
+    }
+}
