@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Wall-clock minutes from a run's submission to its compared workspaces, per task, from the results.
 
-    python3 scripts/walltime.py results figures/cost-parity/walltime.json
+    python3 scripts/walltime.py results figures/cost-parity/walltime.json [-v1]
 
-For every loop experiment under RESULTS with a parity comparison and a cost-to-match search against
-Sol's single workers (results/luna-xhigh-<task>-v1/parity/sol-xhigh-<task>-single.json and
-.match.json), records per run: the minutes to each Sol single worker's build (sol_build1), to each
+For every loop experiment under RESULTS with the given suffix (default -v1; -checker-resumed,
+-worker-loop or -self-review for the other loop variants) that has a parity comparison and a
+cost-to-match search against Sol's single workers
+(results/luna-xhigh-<task><suffix>/parity/sol-xhigh-<task>-single.json and .match.json), records per run: the minutes to each Sol single worker's build (sol_build1), to each
 loop run's parity build (loop_parity_build) and to its deliverable build at the cost-to-match budget
 (loop_match_build; null when the loop never reached Sol's mean score). Times come from each attempt's
 record: the run's submission and the snapshot taken when the build finished.
@@ -47,12 +48,12 @@ def task_times(results: Path, parity: dict, match: dict) -> dict:
     return {"sol_build1": sol_build1, "loop_parity_build": parity_build, "loop_match_build": match_build, "match_deliverables": deliverables}
 
 
-def main(results: Path, out: Path) -> dict:
+def main(results: Path, out: Path, suffix: str = "-v1") -> dict:
     tasks = {}
-    for match_path in sorted(results.glob("luna-xhigh-*/parity/sol-xhigh-*.match.json")):
+    for match_path in sorted(results.glob(f"luna-xhigh-*{suffix}/parity/sol-xhigh-*.match.json")):
         match = json.loads(match_path.read_text())
         parity = json.loads(match_path.with_name(match_path.name.removesuffix(".match.json") + ".json").read_text())
-        task = parity["luna"].removeprefix("luna-xhigh-").removesuffix("-v1")
+        task = parity["luna"].removeprefix("luna-xhigh-").removesuffix(suffix)
         tasks[task] = task_times(results, parity, match)
     record = {"note": NOTE, "tasks": tasks}
     out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
@@ -60,4 +61,4 @@ def main(results: Path, out: Path) -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps({task: {k: v for k, v in t.items() if k != "match_deliverables"} for task, t in main(Path(sys.argv[1]), Path(sys.argv[2]))["tasks"].items()}, indent=1))
+    print(json.dumps({task: {k: v for k, v in t.items() if k != "match_deliverables"} for task, t in main(Path(sys.argv[1]), Path(sys.argv[2]), *sys.argv[3:4])["tasks"].items()}, indent=1))

@@ -4,8 +4,9 @@ minutes, model cost in total and per node, and the cost of a round.
 
     python3 scripts/loop_facts.py results figures/checker-session/loops.json [EXPERIMENT ...]
 
-Reads results/<experiment>/summary.json for every experiment named, or for every luna-xhigh-*-v1 and
-luna-xhigh-*-checker-resumed directory under RESULTS when none is named, and writes
+Reads results/<experiment>/summary.json for every experiment named (a name or its results
+directory), or for every luna-xhigh-*-v1 and luna-xhigh-*-checker-resumed directory under RESULTS
+when none is named, and writes
 {experiment: {run: facts}}.
 """
 
@@ -38,7 +39,7 @@ def main(results: Path, out: Path, experiments: list[str]) -> dict:
     if not experiments:
         experiments = sorted(p.name for p in results.glob("luna-xhigh-*") if p.is_dir() and (p.name.endswith("-v1") or p.name.endswith("-checker-resumed")))
     record = {}
-    for experiment in experiments:
+    for experiment in (Path(e).name for e in experiments):
         summary = json.loads((results / experiment / "summary.json").read_text())
         record[experiment] = {a["label"]: run_facts(a) for a in summary["attempts"] if a.get("arm") == "loop"}
     out.parent.mkdir(parents=True, exist_ok=True)

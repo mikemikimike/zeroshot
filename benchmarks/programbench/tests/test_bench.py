@@ -6,8 +6,10 @@ Requires Python 3.12 (the runner image); the ProgramBench-dependent tests also n
 from __future__ import annotations
 
 import copy
+import importlib.util
 import io
 import json
+import math
 import os
 import random
 import shutil
@@ -945,8 +947,50 @@ class LoopFactsTests(unittest.TestCase):
             results = Path(tmp)
             (results / "luna-xhigh-t-v1").mkdir()
             (results / "luna-xhigh-t-v1" / "summary.json").write_text(json.dumps({"attempts": [attempt, {**attempt, "label": "02-single", "arm": "single"}]}))
+            (results / "luna-xhigh-t-self-review").mkdir()
+            (results / "luna-xhigh-t-self-review" / "summary.json").write_text(json.dumps({"attempts": [{**attempt, "checks": 0, "cost_usd": {"build": 1.0, "total": 1.0}}]}))
+            (results / "luna-xhigh-t-prompt").mkdir()
+            (results / "luna-xhigh-t-prompt" / "summary.json").write_text(json.dumps({"attempts": [attempt]}))
             record = loop_facts.main(results, results / "loops.json", [])
+            by_path = loop_facts.main(results, results / "loops.json", [str(results / "luna-xhigh-t-self-review")])
+        self.assertEqual(list(record), ["luna-xhigh-t-v1"])
         self.assertEqual(list(record["luna-xhigh-t-v1"]), ["01-loop"])
+        self.assertEqual(list(by_path), ["luna-xhigh-t-self-review"])
+        self.assertEqual(by_path["luna-xhigh-t-self-review"]["01-loop"]["cost_check_usd"], None)
+
+
+class WorkerOnlyPlotTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("matplotlib"), "matplotlib is not installed")
+    def test_rows_join_both_variants_with_the_loop_and_the_single_shot(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import plot_worker_only
+
+        self.assertEqual(plot_worker_only.task_of({"luna": "luna-xhigh-tree-sitter-self-review"}), "tree-sitter")
+        with tempfile.TemporaryDirectory() as tmp:
+            figures = Path(tmp)
+            for d in ("cost-parity", "prompt-study", "worker-only"):
+                (figures / d).mkdir()
+
+            def parity(luna: str, mean: float) -> dict:
+                return {"luna": luna, "sol": "sol-xhigh-t-single", "comparisons": {"promotional": {"budget_usd": 4.0, "sol_mean": 60.0, "sol_ci": [58.0, 62.0], "luna_mean": mean, "luna_ci": [mean - 1, mean + 1]}},
+                        "luna_runs": [{"run": "01-loop", "excluded": [], "promotional": {"rounds": 10, "cost_usd": 2.0}}, {"run": "02-loop", "excluded": ["state error"], "promotional": {"rounds": 1, "cost_usd": 0.1}}]}
+
+            (figures / "cost-parity" / "luna-xhigh-t-v1.json").write_text(json.dumps(parity("luna-xhigh-t-v1", 70.0)))
+            (figures / "cost-parity" / "luna-xhigh-t-v1.match.json").write_text(json.dumps({"outcome": "reached", "cost_ratio": 0.5}))
+            (figures / "prompt-study" / "luna-xhigh-t-v1.match.json").write_text(json.dumps({"runs": {"01-prompt": {"pass_pct": {"1": 50.0}}, "02-prompt": {"pass_pct": {"1": 54.0}}}}))
+            paths = []
+            for variant, mean, match in (("worker-loop", 55.0, {"outcome": "never", "cost_ratio": None}), ("self-review", 66.0, {"outcome": "reached", "cost_ratio": 1.5})):
+                path = figures / "worker-only" / f"luna-xhigh-t-{variant}.json"
+                path.write_text(json.dumps(parity(f"luna-xhigh-t-{variant}", mean)))
+                path.with_name(f"luna-xhigh-t-{variant}.match.json").write_text(json.dumps(match))
+                paths.append(path)
+            rows = plot_worker_only.rows_from(paths, figures)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual((row["task"], row["budget"], row["sol"][0], row["loop"][0], row["single"][0]), ("t", 4.0, 60.0, 70.0, 52.0))
+        self.assertEqual((row["worker-loop"][0], row["worker-loop_ratio"], row["worker-loop_rounds"], row["worker-loop_spent"]), (55.0, math.inf, 10.0, 2.0))
+        self.assertEqual((row["self-review"][0], row["self-review_ratio"], row["loop_ratio"]), (66.0, 1.5, 0.5))
+        self.assertIn("told to review its work", plot_worker_only.summary(rows))
 
 
 class WalltimeTests(unittest.TestCase):
@@ -977,6 +1021,14 @@ class WalltimeTests(unittest.TestCase):
             self.assertEqual(record["tasks"]["t"], {"sol_build1": {"01-single": 10.0}, "loop_parity_build": {"01-loop": 30.0}, "loop_match_build": {"01-loop": 20.0}, "match_deliverables": {"01-loop": 2}})
             (parity_dir / "sol-xhigh-t-single.match.json").write_text(json.dumps({"outcome": "never", "deliverables": {"01-loop": 5}}))
             self.assertIsNone(walltime.main(results, results / "walltime.json")["tasks"]["t"]["loop_match_build"])
+            self.assertEqual(walltime.main(results, results / "walltime.json", "-worker-loop")["tasks"], {})
+            attempt("luna-xhigh-t-worker-loop", "01-loop", 3)
+            worker_dir = results / "luna-xhigh-t-worker-loop" / "parity"
+            worker_dir.mkdir()
+            (worker_dir / "sol-xhigh-t-single.json").write_text(json.dumps({**comparison, "luna": "luna-xhigh-t-worker-loop"}))
+            (worker_dir / "sol-xhigh-t-single.match.json").write_text(json.dumps({"outcome": "reached", "deliverables": {"01-loop": 1}}))
+            self.assertEqual(walltime.main(results, results / "walltime.json", "-worker-loop")["tasks"]["t"]["loop_match_build"], {"01-loop": 10.0})
+            self.assertEqual(list(walltime.main(results, results / "walltime.json")["tasks"]), ["t"])
 
 
 class EvalTests(unittest.TestCase):
