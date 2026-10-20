@@ -76,8 +76,9 @@ def rows_from(paths: list[Path], figures: Path) -> list[dict]:
             v = parity["comparisons"]["promotional"]
             row[variant] = (v["luna_mean"], v["luna_ci"])
             row[f"{variant}_ratio"] = match["cost_ratio"] if match["outcome"] == "reached" else math.inf
-            row[f"{variant}_rounds"] = statistics.fmean(r["promotional"]["rounds"] for r in parity["luna_runs"] if not r["excluded"])
-            row[f"{variant}_spent"] = statistics.fmean(r["promotional"]["cost_usd"] for r in parity["luna_runs"] if not r["excluded"] and r["promotional"]["cost_usd"] is not None)
+            runs = [r["promotional"] for r in parity["luna_runs"] if not r["excluded"] and not r["promotional"]["excluded"]]
+            row[f"{variant}_rounds"] = statistics.fmean(r["rounds"] for r in runs)
+            row[f"{variant}_spent"] = statistics.fmean(r["cost_usd"] for r in runs)
         rows.append(row)
     rows.sort(key=lambda r: -(r["self-review"][0] - r["loop"][0]))
     return rows

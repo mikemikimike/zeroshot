@@ -973,7 +973,8 @@ class WorkerOnlyPlotTests(unittest.TestCase):
 
             def parity(luna: str, mean: float) -> dict:
                 return {"luna": luna, "sol": "sol-xhigh-t-single", "comparisons": {"promotional": {"budget_usd": 4.0, "sol_mean": 60.0, "sol_ci": [58.0, 62.0], "luna_mean": mean, "luna_ci": [mean - 1, mean + 1]}},
-                        "luna_runs": [{"run": "01-loop", "excluded": [], "promotional": {"rounds": 10, "cost_usd": 2.0}}, {"run": "02-loop", "excluded": ["state error"], "promotional": {"rounds": 1, "cost_usd": 0.1}}]}
+                        "luna_runs": [{"run": "01-loop", "excluded": [], "promotional": {"rounds": 10, "cost_usd": 2.0, "excluded": []}}, {"run": "02-loop", "excluded": ["state error"], "promotional": {"rounds": 1, "cost_usd": 0.1, "excluded": []}},
+                                      {"run": "03-loop", "excluded": [], "promotional": {"rounds": 1, "cost_usd": 0.1, "excluded": ["scored on 850 tests"]}}]}
 
             (figures / "cost-parity" / "luna-xhigh-t-v1.json").write_text(json.dumps(parity("luna-xhigh-t-v1", 70.0)))
             (figures / "cost-parity" / "luna-xhigh-t-v1.match.json").write_text(json.dumps({"outcome": "reached", "cost_ratio": 0.5}))

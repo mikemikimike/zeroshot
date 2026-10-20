@@ -471,11 +471,21 @@ test containers).
    cp results/luna-xhigh-svgbob-v1/parity/luna-xhigh-svgbob-prompt.match.json figures/prompt-study/luna-xhigh-svgbob-v1.match.json
    cp results/luna-xhigh-svgbob-checker-resumed/parity/sol-xhigh-svgbob-single.json figures/checker-session/luna-xhigh-svgbob-checker-resumed.json
    cp results/luna-xhigh-svgbob-checker-resumed/parity/sol-xhigh-svgbob-single.match.json figures/checker-session/luna-xhigh-svgbob-checker-resumed.match.json
+   cp results/luna-xhigh-svgbob-worker-loop/parity/sol-xhigh-svgbob-single.json figures/worker-loop/luna-xhigh-svgbob-worker-loop.json
+   cp results/luna-xhigh-svgbob-worker-loop/parity/sol-xhigh-svgbob-single.match.json figures/worker-loop/luna-xhigh-svgbob-worker-loop.match.json
+   cp results/luna-xhigh-svgbob-self-review/parity/sol-xhigh-svgbob-single.json figures/self-review/luna-xhigh-svgbob-self-review.json
+   cp results/luna-xhigh-svgbob-self-review/parity/sol-xhigh-svgbob-single.match.json figures/self-review/luna-xhigh-svgbob-self-review.match.json
    python3 scripts/walltime.py results figures/cost-parity/walltime.json
+   python3 scripts/walltime.py results figures/checker-session/walltime.json -checker-resumed
+   python3 scripts/walltime.py results figures/worker-loop/walltime.json -worker-loop
+   python3 scripts/walltime.py results figures/self-review/walltime.json -self-review
    python3 scripts/loop_facts.py results figures/checker-session/loops.json
+   python3 scripts/loop_facts.py results figures/worker-loop/loops.json results/luna-xhigh-*-worker-loop
+   python3 scripts/loop_facts.py results figures/self-review/loops.json results/luna-xhigh-*-self-review
    python3 scripts/plot_parity.py figures/cost-parity/*.json
    python3 scripts/plot_prompt_study.py figures/prompt-study/*.json
    python3 scripts/plot_checker_session.py figures/checker-session/luna-xhigh-*-checker-resumed.json
+   python3 scripts/plot_worker_only.py figures/worker-loop/*.json figures/self-review/*.json
    ```
 
    The plotting scripts need matplotlib; they fetch the fonts once from Google Fonts and fall back
