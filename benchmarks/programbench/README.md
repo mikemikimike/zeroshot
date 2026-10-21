@@ -501,7 +501,9 @@ crashed runner left behind), and hands results back to the invoking user. `eval`
 attempts with the current code and `report` rebuilds the summary; both record that code in the
 manifest and summary. To re-run a smoke test, move its results directory aside first. Other
 settings: `ZSBENCH_RESULTS_DIR`, `ZSBENCH_SECRET_FILE`, `ZSBENCH_DOCKER_SOCK`, `ZSBENCH_IMAGE`,
-`ZSBENCH_EVAL_WORKERS`; `--keep-containers` and `--skip-eval` for `run`; `plan` renders the graphs
+`ZSBENCH_EVAL_WORKERS`, `PROGRAMBENCH_DOCKER_RUN_TIMEOUT` (seconds programbench waits for an
+evaluation container to start, default 300; a build whose container does not start in time gets no
+result and `match` stops until it is run again); `--keep-containers` and `--skip-eval` for `run`; `plan` renders the graphs
 and the attempt order without running anything. Unit tests: `python -m unittest discover -s tests`
 (Python 3.12), or inside the runner image.
 

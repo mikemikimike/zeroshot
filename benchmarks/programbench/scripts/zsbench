@@ -59,6 +59,13 @@ if [[ -n ${ZSBENCH_EVAL_WORKERS:-} ]]; then
   [[ $ZSBENCH_EVAL_WORKERS =~ ^[1-9][0-9]?$ ]] || { echo "ZSBENCH_EVAL_WORKERS must be 1 to 99" >&2; exit 1; }
   args+=(-e "ZSBENCH_EVAL_WORKERS=$ZSBENCH_EVAL_WORKERS")
 fi
+# Seconds programbench waits for `docker run` to start an evaluation container (its default 300).
+# On a loaded host the daemon can take longer, and a build whose container does not start in time
+# gets no result; raise it rather than lose the build. The tests' own timeouts are unchanged.
+if [[ -n ${PROGRAMBENCH_DOCKER_RUN_TIMEOUT:-} ]]; then
+  [[ $PROGRAMBENCH_DOCKER_RUN_TIMEOUT =~ ^[1-9][0-9]{1,4}$ ]] || { echo "PROGRAMBENCH_DOCKER_RUN_TIMEOUT must be 10 to 99999 seconds" >&2; exit 1; }
+  args+=(-e "PROGRAMBENCH_DOCKER_RUN_TIMEOUT=$PROGRAMBENCH_DOCKER_RUN_TIMEOUT")
+fi
 
 temp_secret=""
 cleanup() { if [[ -n $temp_secret ]]; then rm -f "$temp_secret"; fi; }
