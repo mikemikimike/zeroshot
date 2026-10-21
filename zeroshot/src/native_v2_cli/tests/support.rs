@@ -218,6 +218,8 @@ pub(in crate::native_v2_cli) struct FakeBackend {
     terminal_plan_state: Option<MergePlanState>,
     resume_requirements: Option<RunConnectionRequirements>,
     trusted_resume_requirements: Option<RunConnectionRequirements>,
+    resource_scope: Option<openengine_cluster_protocol::ConnectionScope>,
+    unavailable_machine_identity: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -227,6 +229,20 @@ pub(super) enum CursorCallKind {
 }
 
 impl FakeBackend {
+    pub(in crate::native_v2_cli) fn with_unavailable_machine_identity() -> Self {
+        Self {
+            unavailable_machine_identity: true,
+            ..Self::default()
+        }
+    }
+
+    pub(in crate::native_v2_cli) fn with_organization_owner() -> Self {
+        Self {
+            resource_scope: Some(openengine_cluster_protocol::ConnectionScope::Org),
+            ..Self::default()
+        }
+    }
+
     pub(super) fn with_failed_submit() -> Self {
         Self {
             failed_submit: true,
@@ -447,6 +463,20 @@ impl NativeV2CliBackend for FakeBackend {
         Ok(())
     }
 
+    async fn default_resource_scope(
+        &self,
+        _target: Option<&str>,
+    ) -> Result<openengine_cluster_protocol::ConnectionScope, NativeV2CliError> {
+        if self.unavailable_machine_identity {
+            return Err(NativeV2CliError::Target(
+                "machine identity unavailable".to_owned(),
+            ));
+        }
+        Ok(self
+            .resource_scope
+            .unwrap_or(openengine_cluster_protocol::ConnectionScope::User))
+    }
+
     async fn connection_list(
         &self,
         target: Option<&str>,
@@ -510,6 +540,13 @@ impl NativeV2CliBackend for FakeBackend {
             target: target.map(str::to_owned),
             request: request.clone(),
         });
+        if self.resource_scope == Some(openengine_cluster_protocol::ConnectionScope::Org)
+            && request.scope == RunProfileScope::User
+        {
+            return Err(NativeV2CliError::Target(
+                "user profile scope is unavailable".to_owned(),
+            ));
+        }
         Ok(RunProfileListResult {
             profiles: [("alpha", true), ("beta", false)]
                 .into_iter()

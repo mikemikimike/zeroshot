@@ -61,7 +61,9 @@ impl CachedHostedAccess {
         &self,
         target: &TargetRecord,
     ) -> Option<(MergePlansDescriptor, AccessToken)> {
-        (self.identity.target == *target && Instant::now() < self.access.0.reusable_until)
+        (self.identity.target == *target
+            && self.identity.audience == openengine_cluster_protocol::TARGET_CONTROLLER_AUDIENCE
+            && Instant::now() < self.access.0.reusable_until)
             .then(|| {
                 self.merge_plans
                     .clone()
@@ -78,6 +80,12 @@ impl TargetHttpControlAuthority {
         auth: &HostedAuthDescriptor,
         audience: &str,
     ) -> Result<AccessToken, TargetAuthorityError> {
+        if let Some(machine) = &self.machine {
+            return Ok(AccessToken(Arc::new(IssuedAccessToken {
+                value: machine.api_key.clone(),
+                reusable_until: Instant::now(),
+            })));
+        }
         let cached = Arc::clone(&self.hosted_access).lock_owned().await;
         let authority = self.clone();
         let target = target.clone();
@@ -105,6 +113,12 @@ impl TargetHttpControlAuthority {
         cached: &mut Option<CachedHostedAccess>,
         request: HostedAccess<'_>,
     ) -> Result<AccessToken, TargetAuthorityError> {
+        if let Some(machine) = &self.machine {
+            return Ok(AccessToken(Arc::new(IssuedAccessToken {
+                value: machine.api_key.clone(),
+                reusable_until: Instant::now(),
+            })));
+        }
         let HostedAccess {
             target,
             auth,
