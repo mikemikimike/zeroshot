@@ -16,8 +16,9 @@ use unix as native;
 #[cfg(windows)]
 use windows as native;
 
-#[cfg(unix)]
 pub(crate) use native::validate_private_file;
+#[cfg(windows)]
+pub(crate) use native::private_inherited_file;
 
 pub(crate) use native::{
     ControllerChild, FileIdentity, commit_file, create_private_directory, file_identity,
