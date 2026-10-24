@@ -60,10 +60,19 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   lessons. Maintenance contexts and mutation authority are partitioned by lesson scope, including
   repository-qualified graph lessons; each scope's opt-out disables its maintenance and discovery.
   Adaptation provenance names the responsible scoped maintenance specialist. Maintenance uses
-  complete byte-bounded batches and requires exactly one decision per supplied ID/revision; omitted
-  or duplicate decisions cannot count as completed reconciliation. Maintenance consolidates redundant
+  complete byte-bounded batches and requires exactly one decision per supplied ID, bound by the host to its frozen revision; omitted
+  or duplicate decisions cannot count as completed reconciliation. The host owns revision preconditions
+  and increments; agents do not echo or propose revision counters, while prior initialization responses
+  with an explicit revision remain accepted only when it matches the frozen supplied version. Maintenance consolidates redundant
   paraphrases only within the same repository or exact graph/node/repository-qualified scope, retaining
-  one canonical recommendation and all useful detail while deciding every supplied ID. Discovery has no findings count
+  one canonical recommendation and all useful detail while deciding every supplied ID. Rejected discovery proposals report a validation stage and host-owned card field names without echoing
+  proposal text. Repository advice admission detects common literal file:line positions for associated/cited source
+  while preserving ambiguous endpoint, URL and image references;
+  legacy cards remain readable but scoped maintenance must adapt or defer them rather than keep
+  or renumber volatile positions. Postmortem transcript collection scans bounded ledger pages and reclaims its fixed
+  byte budget from the largest execution tail, preserving earlier worker evidence under late reviewer
+  output rather than using a global last-record window. Replay observes cancellation between bounded
+  reads; final context trimming shrinks the largest arrays and retains per-execution transcript tails. Discovery has no findings count
   quota: impact, recurrence, current evidence and usefulness determine admission. Shared transactions
   are bounded by serialized bytes and store capacity rather than a mutation count quota. Their work runs
   before runner closure/cleanup, preserves the durably latched primary outcome and its failure
