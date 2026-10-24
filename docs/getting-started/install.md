@@ -48,16 +48,16 @@ For Codex, complete its [native Windows sandbox setup](https://developers.openai
 if your Codex permission settings require it. Workers and reviewers use the same permission handling;
 Zeroshot does not install the sandbox.
 
-## Connect Zeroshot Cloud
+## Connect Zeroshot Platform
 
-The Cloud target is built in. Sign in once; organization selection happens in the browser:
+The Platform target is built in. Sign in once; organization selection happens in the browser:
 
 ```console
-zeroshot target login cloud
+zeroshot target login platform
 ```
 
-Cloud runs use `--target cloud`. Omit `--target` for local execution. The
-[Zeroshot Cloud docs](https://cloud.zeroshot.sh/docs) cover organizations, the GitHub App, and saved
+Platform runs use `--target platform`. Omit `--target` for local execution. The
+[Zeroshot Platform docs](https://cloud.zeroshot.sh/docs) cover organizations, the GitHub App, and saved
 connections.
 
 ## Open the workspace UI
@@ -76,7 +76,7 @@ To inspect runs on a configured target while keeping profiles in the local CLI s
 zeroshot ui --target docker
 ```
 
-Use `--target cloud` after signing in to inspect Cloud runs through the same local UI.
+Use `--target platform` after signing in to inspect Platform runs through the same local UI.
 
 **Profiles** edits graphs and runtime settings; the info icon explains authoring defaults.
 Saved profiles share the CLI's configuration store (`ZEROSHOT_CONFIG_DIR`); without `--target`,
@@ -88,7 +88,7 @@ zeroshot run --title "My task" --profile local:my-profile --input input.json
 
 Open **Runs** for [live monitoring and replay](../guides/observe-and-control.md#browser).
 The [Docker target](../concepts/targets.md#direct-target) serves its own profiles and runs at `/ui/`.
-Cloud embedding remains tracked in [zero-cloud #301](https://github.com/the-open-engine/zero-cloud/issues/301).
+Platform embedding remains tracked in [zero-cloud #301](https://github.com/the-open-engine/zero-cloud/issues/301).
 
 Release executables embed the UI. To build it from source:
 
