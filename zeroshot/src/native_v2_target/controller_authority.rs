@@ -6,7 +6,9 @@ pub(super) mod credentials;
 #[cfg(feature = "ui")]
 mod history;
 mod hosted_runs;
+mod machine;
 mod profiles;
+mod review;
 
 #[cfg(feature = "ui")]
 pub use history::TargetRunHistoryTransport;
@@ -40,6 +42,7 @@ const DEVICE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
 const SESSION_KIND: &str = "openengine.target-session/v1";
 const DEVICE_LABEL: &str = "zeroshot-cli";
 const ACCESS_TOKEN_EXPIRY_SKEW: Duration = Duration::from_secs(30);
+const ADMIN_AUDIENCE: &str = "admin";
 
 struct HostedLogin<'a> {
     target_id: &'a str,
@@ -63,12 +66,14 @@ pub struct TargetHttpControlAuthority {
     notifier: Arc<dyn DeviceCodeNotifier>,
     refresh_lock_directory: PathBuf,
     hosted_access: Arc<tokio::sync::Mutex<Option<CachedHostedAccess>>>,
+    machine: Option<machine::MachineCredential>,
 }
 
 #[derive(Clone, Copy, Default)]
 struct RequestCapabilities<'a> {
     runtime: Option<&'a RuntimePlan>,
     git_transport: bool,
+    task_resolution: bool,
 }
 
 impl TargetHttpControlAuthority {
@@ -101,6 +106,7 @@ impl TargetHttpControlAuthority {
             notifier: Arc::new(StderrDeviceCodeNotifier),
             refresh_lock_directory,
             hosted_access: Arc::new(tokio::sync::Mutex::new(None)),
+            machine: machine::MachineCredential::from_environment()?,
         })
     }
 
@@ -123,7 +129,19 @@ impl TargetHttpControlAuthority {
             notifier,
             refresh_lock_directory,
             hosted_access: Arc::new(tokio::sync::Mutex::new(None)),
+            machine: None,
         }
+    }
+
+    #[cfg(test)]
+    pub(super) fn with_machine_key(mut self, api_key: &str, organization: Option<&str>) -> Self {
+        self.machine = Some(machine::MachineCredential {
+            api_key: api_key.to_owned(),
+            organization: organization.map(|value| {
+                HeaderValue::from_str(value).unwrap_or_else(|_| panic!("invalid test organization"))
+            }),
+        });
+        self
     }
 
     async fn lock_refresh_family(
@@ -152,14 +170,36 @@ impl TargetHttpControlAuthority {
         purpose: TargetSessionPurpose,
     ) -> Result<(HostedAuthDescriptor, ControllerDescriptor), TargetAuthorityError> {
         let (origin, wire) = self.discovery(target).await?;
-        let auth = build_auth_descriptor(&origin, &wire)?;
+        let auth = self.hosted_auth_descriptor(&origin, &wire)?;
         let controller =
             build_controller_descriptor(&origin, wire, target.access.authentication())?;
         require_session_capability(&controller, purpose)?;
-        let metadata: OAuthMetadataWire =
-            self.get_json(&auth.metadata_url, "OAuth metadata").await?;
-        validate_metadata_routes(&origin, &auth, &metadata)?;
+        self.validate_hosted_metadata(&origin, &auth).await?;
         Ok((auth, controller))
+    }
+
+    fn hosted_auth_descriptor(
+        &self,
+        origin: &Url,
+        wire: &TargetDiscoveryDocument,
+    ) -> Result<HostedAuthDescriptor, TargetAuthorityError> {
+        if self.machine.is_some() {
+            machine::validate_discovery(origin, wire)?;
+        }
+        build_auth_descriptor(origin, wire)
+    }
+
+    async fn validate_hosted_metadata(
+        &self,
+        origin: &Url,
+        auth: &HostedAuthDescriptor,
+    ) -> Result<(), TargetAuthorityError> {
+        if self.machine.is_none() {
+            let metadata: OAuthMetadataWire =
+                self.get_json(&auth.metadata_url, "OAuth metadata").await?;
+            validate_metadata_routes(origin, auth, &metadata)?;
+        }
+        Ok(())
     }
 
     async fn discovery(
@@ -223,7 +263,7 @@ impl TargetHttpControlAuthority {
                 code: &code,
             })
             .await?;
-        self.verify_session(request.auth, &token.access_token)
+        self.verify_access(request.auth, request.audience, &token.access_token)
             .await?;
         self.credentials
             .set(request.target_id, &token.refresh_token)
@@ -320,7 +360,8 @@ impl TargetHttpControlAuthority {
             )
             .await?;
         validate_token(&token)?;
-        self.verify_session(auth, &token.access_token).await?;
+        self.verify_access(auth, audience, &token.access_token)
+            .await?;
         self.credentials
             .set(&target.id, &token.refresh_token)
             .await?;
@@ -357,6 +398,19 @@ impl TargetHttpControlAuthority {
         Ok(())
     }
 
+    async fn verify_access(
+        &self,
+        auth: &HostedAuthDescriptor,
+        audience: &str,
+        access_token: &str,
+    ) -> Result<(), TargetAuthorityError> {
+        if audience == ADMIN_AUDIENCE {
+            self.verify_admin_session(auth, access_token).await
+        } else {
+            self.verify_session(auth, access_token).await
+        }
+    }
+
     fn authorized(
         &self,
         request: reqwest::RequestBuilder,
@@ -366,7 +420,20 @@ impl TargetHttpControlAuthority {
         let mut value = HeaderValue::from_str(&format!("Bearer {token}"))
             .map_err(|_| authority_error("access token is malformed"))?;
         value.set_sensitive(true);
-        Ok(request.header(AUTHORIZATION, value))
+        let request = request.header(AUTHORIZATION, value);
+        Ok(
+            match self
+                .machine
+                .as_ref()
+                .and_then(|machine| machine.organization.as_ref())
+            {
+                Some(organization) => request.header(
+                    openengine_cluster_protocol::MACHINE_ORGANIZATION_HEADER,
+                    organization.clone(),
+                ),
+                None => request,
+            },
+        )
     }
 
     async fn controller_access(
@@ -392,6 +459,7 @@ impl TargetHttpControlAuthority {
             RequestCapabilities {
                 runtime: Some(&request.submission.runtime),
                 git_transport: request.requires_git_transport(),
+                task_resolution: false,
             },
         )
         .await
@@ -437,6 +505,7 @@ impl TargetHttpControlAuthority {
                 Ok((controller, Some(access)))
             }
             TargetAccess::Direct => {
+                self.require_no_machine_for_direct()?;
                 let controller = self.controller_descriptor(target).await?;
                 require_session_capability(&controller, purpose)?;
                 require_request_capabilities(&controller, capabilities)?;
@@ -509,7 +578,12 @@ fn require_request_capabilities(
     capabilities: RequestCapabilities<'_>,
 ) -> Result<(), TargetAuthorityError> {
     if let Some(runtime) = capabilities.runtime {
-        require_node_runtime_lanes(controller, runtime)?;
+        require_runtime_capabilities(controller, runtime)?;
+    }
+    if capabilities.task_resolution && controller.task_resolution.is_none() {
+        return Err(authority_error(
+            "target does not advertise task resolution (openengine.task-resolution/v1)",
+        ));
     }
     require_git_transport(controller, capabilities.git_transport)
 }
@@ -521,6 +595,25 @@ fn require_git_transport(
     if required && !controller.git_transport {
         return Err(authority_error(
             "target does not support generic Git transport (openengine.git-transport/v1)",
+        ));
+    }
+    Ok(())
+}
+
+fn require_runtime_capabilities(
+    controller: &ControllerDescriptor,
+    runtime: &RuntimePlan,
+) -> Result<(), TargetAuthorityError> {
+    require_node_runtime_lanes(controller, runtime)?;
+    if runtime.nodes().values().any(|binding| {
+        matches!(
+            binding,
+            openengine_cluster_protocol::NodeRuntimeBinding::CommentDelivery { .. }
+        )
+    }) && !controller.comment_delivery
+    {
+        return Err(authority_error(
+            "target does not support comment delivery (openengine.comment-delivery/v1)",
         ));
     }
     Ok(())

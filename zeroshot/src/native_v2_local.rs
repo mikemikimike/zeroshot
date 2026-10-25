@@ -16,8 +16,8 @@ use thiserror::Error;
 
 use crate::execution::process::HostedProcessPool;
 use crate::native_v2_candidate::{
-    NativeV2CandidateConfig, NativeV2CandidateDelivery, NativeV2CandidateError,
-    NativeV2HarnessConfig, TrustedDeliveryCapabilities,
+    NativeV2CandidateConfig, NativeV2CandidateCommentDelivery, NativeV2CandidateDelivery,
+    NativeV2CandidateError, NativeV2HarnessConfig, TrustedDeliveryCapabilities,
     build_local_native_v2_candidate_with_authority, build_local_owner_native_v2_candidate,
 };
 use crate::native_v2_claude::{ClaudeAdapterConfig, ClaudeAdapterConfigError};
@@ -130,6 +130,7 @@ pub struct LocalProcessCandidateRequest<'a> {
     pub adopt_existing_delivery: bool,
     pub workspace: &'a Path,
     pub storage: &'a Path,
+    pub memory_storage: Option<&'a Path>,
     pub github_token: Option<String>,
     pub github_token_file: Option<TrustedGitHubTokenFile>,
     pub delivery_validator: Option<TrustedDeliveryValidator>,
@@ -298,6 +299,14 @@ fn pi_agent_directory_path(
     }
 }
 
+/// A branch-independent identity proof for retrospective local history selection.
+/// Runtime source admission still requires an exact attached source when delivery needs one.
+pub(crate) fn local_memory_remote(
+    workspace: &Path,
+) -> Option<openengine_cluster_protocol::GitRemoteUrl> {
+    source::select_remote(workspace, Path::new("git"), None).ok()
+}
+
 pub(crate) fn local_resolved_source(
     current_directory: &Path,
     git_program: &Path,
@@ -349,18 +358,37 @@ fn git_output(
 pub fn build_local_process_candidate(
     request: LocalProcessCandidateRequest<'_>,
 ) -> Result<Arc<dyn NodeRunner>, LocalCompositionError> {
-    build_local_candidate_config(request, false).map(|candidate| Arc::new(candidate) as _)
+    let admitted = request.admitted;
+    let prepared = crate::active_memory::runtime::PreparedActiveMemory::prepare(
+        crate::active_memory::runtime::MemoryPreparation {
+            admitted,
+            workspace: request.workspace,
+            storage: request.memory_storage,
+        },
+    );
+    let hooks = prepared
+        .as_ref()
+        .ok()
+        .and_then(|memory| memory.as_ref())
+        .map(|memory| memory.hooks.clone());
+    let runner = build_local_candidate_config(request, false, hooks)?;
+    Ok(match prepared {
+        Ok(Some(memory)) => memory.wrap(admitted, runner),
+        Ok(None) => Arc::new(runner),
+        Err(_) => crate::active_memory::runtime::unavailable_memory(Arc::new(runner)),
+    })
 }
 
 pub(crate) fn build_local_owner_process_candidate(
     request: LocalProcessCandidateRequest<'_>,
 ) -> Result<Arc<NativeNodeRunner>, LocalCompositionError> {
-    build_local_candidate_config(request, true).map(Arc::new)
+    build_local_candidate_config(request, true, None).map(Arc::new)
 }
 
 fn build_local_candidate_config(
     request: LocalProcessCandidateRequest<'_>,
     owner_scoped: bool,
+    active_memory: Option<Arc<crate::active_memory::hooks::ActiveMemoryHooks>>,
 ) -> Result<NativeNodeRunner, LocalCompositionError> {
     validate_local_environment(request.admitted.environment.as_ref())?;
     let LocalProcessCandidateRequest {
@@ -369,6 +397,7 @@ fn build_local_candidate_config(
         adopt_existing_delivery,
         workspace,
         storage,
+        memory_storage: _,
         github_token,
         github_token_file,
         delivery_validator,
@@ -412,7 +441,7 @@ fn build_local_candidate_config(
         .map_err(|_| LocalCompositionError::ResolvedSource)?;
         Some(NativeV2CandidateDelivery {
             config: NativeV2DeliveryConfig {
-                delivery_run_id,
+                delivery_run_id: delivery_run_id.clone(),
                 adopt_existing_delivery,
                 git_identity: None,
                 workspace: workspace.to_owned(),
@@ -424,7 +453,17 @@ fn build_local_candidate_config(
             git_credentials,
         })
     };
+    let comment_delivery = local_comment_delivery(LocalCommentRequest {
+        admitted,
+        delivery_run_id: &delivery_run_id,
+        storage,
+        environment: native_environment,
+        workspace,
+        runtime_home: &runtime_home,
+    })?;
     let config = NativeV2CandidateConfig {
+        active_memory,
+        comment_delivery,
         lanes,
         workspace: workspace.to_owned(),
         delivery,
@@ -631,6 +670,11 @@ pub(crate) fn check_delivery_executables(
     native_environment: &BTreeMap<String, String>,
     working_directory: &Path,
 ) -> Result<(), LocalCompositionError> {
+    if crate::native_v2_admission::comment_node(&submission.graph.root).is_some()
+        && find_local_executable("gh", native_environment, working_directory).is_none()
+    {
+        return Err(LocalCompositionError::MissingDeliveryExecutable { executable: "gh" });
+    }
     let required = crate::native_v2_admission::delivery_capabilities(&submission.graph.root);
     match &submission.source {
         Some(source) if !required.is_empty() => {
@@ -684,3 +728,59 @@ fn prepare_private_directory(path: &Path) -> Result<(), LocalCompositionError> {
 #[cfg(test)]
 #[path = "native_v2_local/tests.rs"]
 mod contract_tests;
+
+struct LocalCommentRequest<'a> {
+    admitted: &'a AdmittedRun,
+    delivery_run_id: &'a RunId,
+    storage: &'a Path,
+    environment: &'a BTreeMap<String, String>,
+    workspace: &'a Path,
+    runtime_home: &'a Path,
+}
+
+fn local_comment_delivery(
+    request: LocalCommentRequest<'_>,
+) -> Result<Option<NativeV2CandidateCommentDelivery>, LocalCompositionError> {
+    let LocalCommentRequest {
+        admitted,
+        delivery_run_id,
+        storage,
+        environment,
+        workspace,
+        runtime_home,
+    } = request;
+    use crate::native_v2_comment_delivery::{
+        LocalCommentPublicationStore, NativeV2CommentDeliveryConfig,
+    };
+    use crate::source_code_provider::adapters::core::{GhCliAuthorityConfig, comment_authority};
+    let Some(input) = crate::native_v2_admission::admitted_comment_input(admitted)? else {
+        return Ok(None);
+    };
+    let gh = find_local_executable("gh", environment, workspace)
+        .ok_or(LocalCompositionError::MissingDeliveryExecutable { executable: "gh" })?;
+    let mut config = GhCliAuthorityConfig::hosted(runtime_home.to_owned());
+    config.gh_program = gh;
+    let authority =
+        comment_authority(config, &input.url).map_err(|_| LocalCompositionError::ResolvedSource)?;
+    let state = storage
+        .parent()
+        .and_then(Path::parent)
+        .ok_or(LocalCompositionError::Workspace)?
+        .join("comment-publications");
+    prepare_private_directory(&state)?;
+    Ok(Some(NativeV2CandidateCommentDelivery {
+        config: NativeV2CommentDeliveryConfig {
+            delivery_run_id: delivery_run_id.clone(),
+            expected_url: input.url,
+            expected_review_scope: input.review_scope,
+            source_revision: admitted
+                .source
+                .as_ref()
+                .map(|source| source.revision.as_str().to_owned()),
+        },
+        authority,
+        store: Arc::new(LocalCommentPublicationStore::new(
+            state.join(format!("{}.json", delivery_run_id.as_str())),
+        )),
+    }))
+}

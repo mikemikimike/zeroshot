@@ -31,8 +31,21 @@ use failure::{error_logs, runtime_failure_status, runtime_failure_watch};
 mod lifecycle;
 use lifecycle::{permanent_reopen_watch, queued_watch};
 
+pub(in crate::native_v2_cli) fn prepared_review_fixture() -> crate::native_v2_review::PreparedReview
+{
+    crate::native_v2_review::PreparedReview {
+        initial_input:json!({"url":"https://github.com/acme/project/issues/42","context":{"title":"Proposal","body":"Assess this","reviewScope":{}}}),
+        source:serde_json::from_value(json!({"repository":"acme/project","branch":"main","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})).assert_value(),
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::native_v2_cli) enum Call {
+    ResolveReview {
+        target: Option<String>,
+        request: crate::native_v2_review::ReviewResolutionRequest,
+        runtime: RuntimePlan,
+    },
     TargetAdd {
         name: String,
         url: String,
@@ -218,6 +231,10 @@ pub(in crate::native_v2_cli) struct FakeBackend {
     terminal_plan_state: Option<MergePlanState>,
     resume_requirements: Option<RunConnectionRequirements>,
     trusted_resume_requirements: Option<RunConnectionRequirements>,
+    resource_scope: Option<openengine_cluster_protocol::ConnectionScope>,
+    unavailable_machine_identity: bool,
+    review: Option<crate::native_v2_review::PreparedReview>,
+    review_file_change: Option<(std::path::PathBuf, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -227,6 +244,35 @@ pub(super) enum CursorCallKind {
 }
 
 impl FakeBackend {
+    pub(crate) fn with_review(review: crate::native_v2_review::PreparedReview) -> Self {
+        Self {
+            review: Some(review),
+            ..Self::default()
+        }
+    }
+
+    pub(super) fn with_review_file_change(
+        mut self,
+        path: std::path::PathBuf,
+        contents: String,
+    ) -> Self {
+        self.review_file_change = Some((path, contents));
+        self
+    }
+    pub(in crate::native_v2_cli) fn with_unavailable_machine_identity() -> Self {
+        Self {
+            unavailable_machine_identity: true,
+            ..Self::default()
+        }
+    }
+
+    pub(in crate::native_v2_cli) fn with_organization_owner() -> Self {
+        Self {
+            resource_scope: Some(openengine_cluster_protocol::ConnectionScope::Org),
+            ..Self::default()
+        }
+    }
+
     pub(super) fn with_failed_submit() -> Self {
         Self {
             failed_submit: true,
@@ -431,6 +477,25 @@ impl NativeV2CliBackend for FakeBackend {
     type Logs = FakeSubscription<RunLogEventNotification>;
     type Attach = FakeSubscription<RunAttachEventNotification>;
 
+    async fn resolve_review(
+        &self,
+        target: Option<&str>,
+        request: crate::native_v2_review::ReviewResolutionRequest,
+        runtime: &openengine_cluster_protocol::RuntimePlan,
+    ) -> Result<crate::native_v2_review::PreparedReview, NativeV2CliError> {
+        self.calls.lock().assert_value().push(Call::ResolveReview {
+            target: target.map(str::to_owned),
+            request,
+            runtime: runtime.clone(),
+        });
+        if let Some((path, contents)) = &self.review_file_change {
+            std::fs::write(path, contents).assert_value();
+        }
+        self.review
+            .clone()
+            .ok_or_else(|| NativeV2CliError::Target("review fixture unavailable".into()))
+    }
+
     async fn target_add(&self, request: TargetAdd) -> Result<(), NativeV2CliError> {
         self.calls.lock().assert_value().push(Call::TargetAdd {
             name: request.name,
@@ -445,6 +510,20 @@ impl NativeV2CliBackend for FakeBackend {
             name: name.to_owned(),
         });
         Ok(())
+    }
+
+    async fn default_resource_scope(
+        &self,
+        _target: Option<&str>,
+    ) -> Result<openengine_cluster_protocol::ConnectionScope, NativeV2CliError> {
+        if self.unavailable_machine_identity {
+            return Err(NativeV2CliError::Target(
+                "machine identity unavailable".to_owned(),
+            ));
+        }
+        Ok(self
+            .resource_scope
+            .unwrap_or(openengine_cluster_protocol::ConnectionScope::User))
     }
 
     async fn connection_list(
@@ -510,6 +589,13 @@ impl NativeV2CliBackend for FakeBackend {
             target: target.map(str::to_owned),
             request: request.clone(),
         });
+        if self.resource_scope == Some(openengine_cluster_protocol::ConnectionScope::Org)
+            && request.scope == RunProfileScope::User
+        {
+            return Err(NativeV2CliError::Target(
+                "user profile scope is unavailable".to_owned(),
+            ));
+        }
         Ok(RunProfileListResult {
             profiles: [("alpha", true), ("beta", false)]
                 .into_iter()

@@ -26,7 +26,7 @@ use openengine_cluster_server::identity::ConnectionIdentity;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
-use crate::native_v2_cloud::NativeV2CloudController;
+use crate::native_v2_platform::NativeV2PlatformController;
 pub use operator_diagnostics::{OperatorDiagnosticJsonLines, OperatorDiagnosticOutput};
 pub(crate) use operator_diagnostics::{
     MAX_OPERATOR_DIAGNOSTIC_TEXT_BYTES, NewOperatorDiagnostic, OperatorDiagnosticStore,
@@ -93,6 +93,25 @@ impl TargetAuthorityError {
 /// environment, exact source checkout, and private capsule allocator for this target process.
 #[async_trait]
 pub trait TargetControllerFactory: Send + Sync {
+    fn supports_comment_delivery(&self) -> bool {
+        false
+    }
+
+    /// A hosted resolver selects credentials from its own authenticated owner scope.
+    fn supports_task_resolution(&self, _authentication: TargetAuthentication) -> bool {
+        false
+    }
+
+    async fn resolve_task(
+        &self,
+        _request: crate::native_v2_review::ReviewResolutionRequest,
+        _github_token: Option<String>,
+    ) -> Result<crate::native_v2_review::PreparedReview, TargetAuthorityError> {
+        Err(TargetAuthorityError::unavailable(
+            "task resolution is unsupported",
+        ))
+    }
+
     /// Reports whether controllers from this factory can recover retained workspaces.
     fn supports_workspace_recovery(&self) -> bool {
         false
@@ -108,11 +127,11 @@ pub trait TargetControllerFactory: Send + Sync {
         false
     }
 
-    async fn create(&self) -> Result<Arc<NativeV2CloudController>, TargetAuthorityError>;
+    async fn create(&self) -> Result<Arc<NativeV2PlatformController>, TargetAuthorityError>;
 
     async fn submit(
         &self,
-        controller: &NativeV2CloudController,
+        controller: &NativeV2PlatformController,
         request: TargetRunRequest,
     ) -> Result<TargetRunReceipt, TargetAuthorityError>;
 }
@@ -139,7 +158,7 @@ pub trait TargetSessionAuthority: Send + Sync {
 }
 
 struct AuthorityState {
-    controller: Option<Arc<NativeV2CloudController>>,
+    controller: Option<Arc<NativeV2PlatformController>>,
 }
 
 /// One target-wide state machine shared by every HTTP and OECP connection.
@@ -151,6 +170,22 @@ pub struct NativeV2TargetAuthority {
 }
 
 impl NativeV2TargetAuthority {
+    fn supports_comment_delivery(&self) -> bool {
+        self.factory.supports_comment_delivery()
+    }
+
+    fn supports_task_resolution(&self, authentication: TargetAuthentication) -> bool {
+        self.factory.supports_task_resolution(authentication)
+    }
+
+    async fn resolve_task(
+        &self,
+        request: crate::native_v2_review::ReviewResolutionRequest,
+        github_token: Option<String>,
+    ) -> Result<crate::native_v2_review::PreparedReview, TargetAuthorityError> {
+        self.factory.resolve_task(request, github_token).await
+    }
+
     #[must_use]
     pub fn new(factory: Arc<dyn TargetControllerFactory>) -> Self {
         Self::new_with_operator_diagnostics(factory, Arc::new(OperatorDiagnosticStore::default()))
@@ -198,7 +233,9 @@ impl NativeV2TargetAuthority {
     }
 
     /// Activates exactly one controller and returns the same authority for every target session.
-    pub async fn controller(&self) -> Result<Arc<NativeV2CloudController>, TargetAuthorityError> {
+    pub async fn controller(
+        &self,
+    ) -> Result<Arc<NativeV2PlatformController>, TargetAuthorityError> {
         let mut state = self.state.lock().await;
         if let Some(controller) = &state.controller {
             return Ok(controller.clone());

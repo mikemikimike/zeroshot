@@ -38,6 +38,24 @@ def runtime() -> UniformRuntime:
     )
 
 
+def test_uniform_runtime_preserves_memory_controls_without_aliasing() -> None:
+    settings = {"postmortem": {"enabled": False}}
+    selected = UniformRuntime(
+        harness="pi",
+        provider="bedrock",
+        model="caller-model",
+        active_memory={"repository": False, "graph": True, "budgetBytes": 512},
+        global_agents=settings,
+    )
+    encoded = selected.to_dict()
+    assert encoded["activeMemory"] == {"repository": False, "graph": True, "budgetBytes": 512}
+    assert encoded["globalAgents"] == settings
+    settings["postmortem"]["enabled"] = True
+    assert encoded["globalAgents"] == {"postmortem": {"enabled": False}}
+    assert "activeMemory" not in runtime().to_dict()
+    assert "globalAgents" not in runtime().to_dict()
+
+
 def test_uniform_runtime_requires_an_explicit_harness() -> None:
     with pytest.raises(TypeError, match="harness"):
         UniformRuntime(provider="openrouter", model="gpt-5.6-luna")  # type: ignore[call-arg]
@@ -63,7 +81,7 @@ def test_submission_keeps_opening_folder_after_chdir(
     target = {
         "local": LocalTarget(workspace),
         "direct": DirectTarget("http://127.0.0.1:8080", workspace=workspace),
-        "hosted": HostedTarget("cloud"),
+        "hosted": HostedTarget("platform"),
     }[target_kind]
     monkeypatch.chdir(launcher)
 
@@ -304,12 +322,35 @@ def test_presets_are_read_from_executable(fake_native: Path) -> None:
     ] in arguments
 
 
+@pytest.mark.parametrize("delivery", [None, "none", "push", "pull_request", "merge"])
+def test_preset_defaults_are_native_and_explicit_delivery_is_preserved(
+    fake_native: Path, delivery: str | None
+) -> None:
+    async def exercise() -> None:
+        async with Client(
+            preset=Preset("software-change", delivery=delivery), runtime=runtime()
+        ) as client:
+            await client.get_preset("software-change", delivery=delivery)
+            await client.submit("inspect it")
+
+    asyncio.run(exercise())
+    arguments = [item["args"] for item in read_invocations(fake_native)]
+    selected = [
+        item for item in arguments if item[:2] == ["template", "show"] or item[:1] == ["run"]
+    ]
+    assert len(selected) == 3
+    for item in selected:
+        if delivery is None:
+            assert "--delivery" not in item
+        else:
+            assert item[item.index("--delivery") + 1] == delivery
+
+
 def test_preset_can_disable_pull_request_feedback(fake_native: Path) -> None:
     async def exercise() -> None:
         async with Client(
             preset=Preset(
                 "software-change",
-                delivery="pull_request",
                 pull_request_feedback="ignore",
             ),
             runtime=runtime(),
@@ -425,7 +466,7 @@ def test_hosted_plan_submission_uses_one_strict_manifest(
     )
 
     async def exercise() -> None:
-        async with Client(target=HostedTarget("cloud")) as client:
+        async with Client(target=HostedTarget("platform")) as client:
             plan = await client.submit_plan(request)
             assert plan.id == "01900000-0000-7000-8000-000000000010"
 
@@ -448,14 +489,14 @@ def test_hosted_plan_submission_uses_one_strict_manifest(
     }
     assert all(item["plan"] == expected for item in invocations)
     submitted = invocations[1]["args"]
-    assert submitted[submitted.index("--target") + 1] == "cloud"
+    assert submitted[submitted.index("--target") + 1] == "platform"
     assert submitted[submitted.index("--submission-key") + 1] == submission_key
     assert "--detach" in submitted
 
 
 def test_hosted_plan_handle_observes_waits_and_force_stops(fake_native: Path) -> None:
     async def exercise() -> None:
-        async with Client(target=HostedTarget("cloud")) as client:
+        async with Client(target=HostedTarget("platform")) as client:
             plan = client.get_plan("01900000-0000-7000-8000-000000000010")
             status = await plan.status()
             assert status.state == "queued"
@@ -469,7 +510,7 @@ def test_hosted_plan_handle_observes_waits_and_force_stops(fake_native: Path) ->
 
     asyncio.run(exercise())
     arguments = [item["args"] for item in read_invocations(fake_native)]
-    assert all(args[args.index("--target") + 1] == "cloud" for args in arguments)
+    assert all(args[args.index("--target") + 1] == "platform" for args in arguments)
     assert any(args[:2] == ["plan", "status"] for args in arguments)
     assert any(args[:2] == ["plan", "watch"] for args in arguments)
     assert any(args[:2] == ["plan", "force-stop"] for args in arguments)
@@ -484,7 +525,7 @@ def test_hosted_plan_watch_accepts_terminal_status_before_cli_failure(
     monkeypatch.setenv("FAKE_PLAN_WATCH_TERMINAL", state)
 
     async def exercise() -> None:
-        async with Client(target=HostedTarget("cloud")) as client:
+        async with Client(target=HostedTarget("platform")) as client:
             plan = client.get_plan("01900000-0000-7000-8000-000000000010")
             statuses = [status.state async for status in plan.watch()]
             assert statuses == ["running", state]
@@ -500,7 +541,7 @@ def test_hosted_plan_watch_propagates_preterminal_cli_failure(
 
     async def exercise() -> None:
         observed = []
-        async with Client(target=HostedTarget("cloud")) as client:
+        async with Client(target=HostedTarget("platform")) as client:
             plan = client.get_plan("01900000-0000-7000-8000-000000000010")
             with pytest.raises(TargetError, match="failed before terminal") as caught:
                 async for status in plan.watch():
@@ -519,7 +560,7 @@ def test_hosted_plan_watch_propagates_unexpected_failure_after_success(
 
     async def exercise() -> None:
         observed = []
-        async with Client(target=HostedTarget("cloud")) as client:
+        async with Client(target=HostedTarget("platform")) as client:
             plan = client.get_plan("01900000-0000-7000-8000-000000000010")
             with pytest.raises(TargetError, match="finished unsuccessfully"):
                 async for status in plan.watch():

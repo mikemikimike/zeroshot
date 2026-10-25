@@ -7,22 +7,24 @@ Regenerate it with `cargo run -p zeroshot --example generate_cli_docs -- --write
 ## `zeroshot`
 
 ```text
-Run multi-agent graphs locally or on named Zeroshot targets.
+Enforce your team's QA process on coding agents: run the graph you define locally or on named Zeroshot targets.
 
 Single-result commands write JSON. Foreground `run`, `watch`, `logs`, and `attach` stream newline-delimited JSON (NDJSON).
 
 Usage: zeroshot [COMMAND]
 
 Commands:
+  memory             Initialize local Active Memory through the canonical skill
   acp                Serve one local Zeroshot profile as an experimental ACP agent over stdio
   ui                 Serve the local profile editor and live or recorded run history
   target             Manage named targets or serve a direct target
+  delegation         Manage user or organization machine delegations and API keys
   connection         Inspect and manage named runtime connections
   profile            Manage reusable graph/runtime profiles
   template           Inspect built-in graph templates
   plan               Validate, submit, and observe hosted merge plans
   run                Submit a graph run locally or to a named target
-  update             Update this executable and managed agent skill to the newest canonical release
+  update             Update this executable and managed agent skills to the newest canonical release
   list               List runs as JSON
   status             Read a run's current status as JSON
   watch              Follow a run's durable event stream as NDJSON
@@ -41,6 +43,57 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+```
+
+### `zeroshot memory`
+
+```text
+Initialize local Active Memory through the canonical skill
+
+Usage: zeroshot memory <COMMAND>
+
+Commands:
+  init  Initialize local Active Memory or resume its saved work
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help
+```
+
+#### `zeroshot memory init`
+
+```text
+Initialize local Active Memory or resume its saved work.
+
+Creates a private session directory on the first call. Later calls return pending agent tasks, validate their responses, and publish after complete maintenance. The zeroshot-memory-init skill orchestrates the specialists using the host's connections. This command makes no model calls. It discovers all finished local runs and uses their recorded checkouts for current-source maintenance.
+
+Usage: zeroshot memory init [OPTIONS] --directory <DIR>
+
+Options:
+      --ignore-repos <REPO>...
+          Repositories to exclude by inventory alias: name, owner/repo, absolute path or repo ID. Comma-separated or repeated; saved with the session. Matching is exact and case-sensitive
+
+      --ignore-graphs <GRAPH>...
+          Graphs to exclude by exact authored root name or graph hash shown in the inventory. Comma-separated or repeated; saved with the session. Matching is exact and case-sensitive
+
+      --directory <DIR>
+          Private session directory outside repository checkouts; created if it does not exist
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+#### `zeroshot memory help`
+
+```text
+Print this message or the help of the given subcommand(s)
+
+Usage: zeroshot memory help [COMMAND]
+
+Commands:
+  init  Initialize local Active Memory or resume its saved work
+  help  Print this message or the help of the given subcommand(s)
 ```
 
 ### `zeroshot acp`
@@ -87,7 +140,7 @@ Options:
 ```text
 Manage named targets or serve a direct target.
 
-The built-in `cloud` target points to https://api.cloud.zeroshot.sh. Run `zeroshot target login cloud` to sign in. See https://cloud.zeroshot.sh/docs for Cloud setup.
+The built-in `platform` target points to https://api.cloud.zeroshot.sh. Run `zeroshot target login platform` to sign in. For unattended access, set ZEROSHOT_API_KEY instead of logging in. See https://cloud.zeroshot.sh/docs for Platform setup.
 
 Usage: zeroshot target <COMMAND>
 
@@ -186,6 +239,255 @@ Commands:
   help   Print this message or the help of the given subcommand(s)
 ```
 
+### `zeroshot delegation`
+
+```text
+Manage user or organization machine delegations and API keys.
+
+Requires human login. Set ZEROSHOT_API_KEY for unattended target commands; set ZEROSHOT_ORGANIZATION to select an organization with a user-owned key.
+
+Usage: zeroshot delegation <COMMAND>
+
+Commands:
+  list     List delegation metadata without secret keys
+  create   Create a delegation and its first API key. Prints the key once
+  show     Read one delegation and its key metadata
+  disable  Disable a delegation and revoke its access
+  key      Create, inspect, or revoke a delegation's API keys
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+API keys act with their owner's current permissions and support every target command except delegation management. User-owned delegations follow the user's memberships; organization-owned delegations stay in one organization and require an owner or admin to manage. Keys expire after 90 days by default, with a maximum of 365 days. Creation prints the secret once. Store it in your CI secret store; do not put it in profiles, connections, or run input.
+```
+
+#### `zeroshot delegation list`
+
+```text
+List delegation metadata without secret keys
+
+Usage: zeroshot delegation list [OPTIONS]
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+      --owner <OWNER>
+          Delegate your user or an organization
+
+          [default: user]
+          [possible values: user, org]
+
+      --organization <UUID>
+          Organization UUID. Required with --owner org
+
+  -h, --help
+          Print help
+```
+
+#### `zeroshot delegation create`
+
+```text
+Create a delegation and its first API key. Prints the key once
+
+Usage: zeroshot delegation create [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>
+          Display name for this machine delegation
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+      --owner <OWNER>
+          Delegate your user or an organization
+
+          [default: user]
+          [possible values: user, org]
+
+      --organization <UUID>
+          Organization UUID. Required with --owner org
+
+      --expires-in-days <EXPIRES_IN_DAYS>
+          API key lifetime in days (1-365)
+
+          [default: 90]
+
+  -h, --help
+          Print help
+```
+
+#### `zeroshot delegation show`
+
+```text
+Read one delegation and its key metadata
+
+Usage: zeroshot delegation show [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          Delegation UUID
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+  -h, --help
+          Print help
+```
+
+#### `zeroshot delegation disable`
+
+```text
+Disable a delegation and revoke its access
+
+Usage: zeroshot delegation disable [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          Delegation UUID
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+  -h, --help
+          Print help
+```
+
+#### `zeroshot delegation key`
+
+```text
+Create, inspect, or revoke a delegation's API keys
+
+Usage: zeroshot delegation key <COMMAND>
+
+Commands:
+  list    List key metadata without secrets
+  create  Create another key for overlapping rotation. Prints the key once
+  revoke  Revoke one key. Accepted runs continue
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help
+```
+
+##### `zeroshot delegation key list`
+
+```text
+List key metadata without secrets
+
+Usage: zeroshot delegation key list [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          Delegation UUID
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+  -h, --help
+          Print help
+```
+
+##### `zeroshot delegation key create`
+
+```text
+Create another key for overlapping rotation. Prints the key once
+
+Usage: zeroshot delegation key create [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          Delegation UUID
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+      --name <NAME>
+          Optional label for this key
+
+      --expires-in-days <EXPIRES_IN_DAYS>
+          API key lifetime in days (1-365)
+
+          [default: 90]
+
+  -h, --help
+          Print help
+```
+
+##### `zeroshot delegation key revoke`
+
+```text
+Revoke one key. Accepted runs continue
+
+Usage: zeroshot delegation key revoke [OPTIONS] <ID> <KEY_ID>
+
+Arguments:
+  <ID>
+          Delegation UUID
+
+  <KEY_ID>
+          Key UUID
+
+Options:
+      --target <NAME>
+          Configured hosted target
+
+          [default: platform]
+
+  -h, --help
+          Print help
+```
+
+##### `zeroshot delegation key help`
+
+```text
+Print this message or the help of the given subcommand(s)
+
+Usage: zeroshot delegation key help [COMMAND]
+
+Commands:
+  list    List key metadata without secrets
+  create  Create another key for overlapping rotation. Prints the key once
+  revoke  Revoke one key. Accepted runs continue
+  help    Print this message or the help of the given subcommand(s)
+```
+
+#### `zeroshot delegation help`
+
+```text
+Print this message or the help of the given subcommand(s)
+
+Usage: zeroshot delegation help [COMMAND]
+
+Commands:
+  list     List delegation metadata without secret keys
+  create   Create a delegation and its first API key. Prints the key once
+  show     Read one delegation and its key metadata
+  disable  Disable a delegation and revoke its access
+  key      Create, inspect, or revoke a delegation's API keys
+  help     Print this message or the help of the given subcommand(s)
+```
+
 ### `zeroshot connection`
 
 ```text
@@ -236,9 +538,8 @@ Options:
           Use this named hosted target. If omitted, use local connections
 
       --scope <SCOPE>
-          Select user- or organization-scoped connections
+          Connection scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -267,9 +568,8 @@ Options:
           Use this named hosted target. If omitted, use local connections
 
       --scope <SCOPE>
-          Select user- or organization-scoped connections
+          Connection scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -299,9 +599,8 @@ Options:
           Use this named hosted target. If omitted, use local connections
 
       --scope <SCOPE>
-          Select user- or organization-scoped connections
+          Connection scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -354,9 +653,8 @@ Options:
           Use this named hosted target. If omitted, use local profiles
 
       --scope <SCOPE>
-          Select user- or organization-scoped hosted profiles
+          Hosted profile scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -383,6 +681,8 @@ Options:
           - single-worker:   A single general-purpose worker
           - software-change: A review, validation, and optional delivery workflow for code changes
           - auto-research:   Research with ten iterations by default and independent evidence gates
+          - issue-review:    Inspect an issue proposal and post a review report
+          - pr-review:       Review a PR diff, conditionally reproduce behavior, and post a concise report
 
       --runtime-config <FILE>
 
@@ -394,7 +694,7 @@ Options:
 
 
       --delivery <MODE>
-          Materialize this template-owned delivery mode
+          Template delivery mode. Defaults to pull_request for software-change, comment for issue-review and pr-review, otherwise none
 
       --push
           Commit and push the managed run branch without opening a pull request
@@ -412,9 +712,8 @@ Options:
           Use this named hosted target. If omitted, use local profiles
 
       --scope <SCOPE>
-          Select user- or organization-scoped hosted profiles
+          Hosted profile scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -437,9 +736,8 @@ Options:
           Use this named hosted target. If omitted, use local profiles
 
       --scope <SCOPE>
-          Select user- or organization-scoped hosted profiles
+          Hosted profile scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -462,9 +760,8 @@ Options:
           Use this named hosted target. If omitted, use local profiles
 
       --scope <SCOPE>
-          Select user- or organization-scoped hosted profiles
+          Hosted profile scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -487,9 +784,8 @@ Options:
           Use this named hosted target. If omitted, use local profiles
 
       --scope <SCOPE>
-          Select user- or organization-scoped hosted profiles
+          Hosted profile scope. Defaults to the authenticated owner's scope
 
-          [default: user]
           [possible values: user, org]
 
   -h, --help
@@ -556,10 +852,12 @@ Arguments:
           - single-worker:   A single general-purpose worker
           - software-change: A review, validation, and optional delivery workflow for code changes
           - auto-research:   Research with ten iterations by default and independent evidence gates
+          - issue-review:    Inspect an issue proposal and post a review report
+          - pr-review:       Review a PR diff, conditionally reproduce behavior, and post a concise report
 
 Options:
       --delivery <MODE>
-          Materialize this template-owned delivery mode
+          Template delivery mode. Defaults to pull_request for software-change, comment for issue-review and pr-review, otherwise none
 
       --push
           Commit and push the managed run branch without opening a pull request
@@ -627,7 +925,7 @@ The JSON manifest is strict and self-contained:
 Every run uses the same source and profile. The profile must contain exactly one current Git merge delivery node;
 pull-request delivery is rejected. Agent bindings must not declare `GH_TOKEN`; only the Git delivery
 binding may declare it. `needs` gates readiness but does not pass output between runs.
-Cloud assigns every run ID atomically at submission. After a node's dependencies succeed, Cloud
+Platform assigns every run ID atomically at submission. After a node's dependencies succeed, Platform
 materializes it against an exact source revision. Once materialization completes, `readyAt` is set
 and the node's queue deadline is the earlier of `expiresAt` and seven days after `readyAt`.
 `expiresAt` must be in the future and no more than
@@ -757,7 +1055,7 @@ Local runs use --cwd or the invoking folder; Git worktrees use their root. Local
 
 A foreground run follows NDJSON events until completion. --detach returns after submission. Ctrl-C before the submission attempt begins cancels the command; once it begins, Ctrl-C waits for the receipt and then detaches. During observation, Ctrl-C detaches without stopping the run.
 
-Usage: zeroshot run [OPTIONS] --title <TITLE> --input <FILE>
+Usage: zeroshot run [OPTIONS] --title <TITLE>
 
 Options:
       --title <TITLE>
@@ -773,9 +1071,14 @@ Options:
           - single-worker:   A single general-purpose worker
           - software-change: A review, validation, and optional delivery workflow for code changes
           - auto-research:   Research with ten iterations by default and independent evidence gates
+          - issue-review:    Inspect an issue proposal and post a review report
+          - pr-review:       Review a PR diff, conditionally reproduce behavior, and post a concise report
 
       --input <FILE>
           Load the graph's initial input from this JSON file
+
+      --task-from <URL>
+          Resolve a GitHub issue or pull-request URL into review input before starting
 
       --runtime-config <FILE>
           Load an exact secret-free runtime plan from this JSON file
@@ -826,7 +1129,7 @@ Options:
           Remote profiles still require target access. This does not check dependency installation or connection availability.
 
       --delivery <MODE>
-          Materialize this template-owned delivery mode
+          Template delivery mode. Defaults to pull_request for software-change, comment for issue-review and pr-review, otherwise none
 
       --push
           Commit and push the managed run branch without opening a pull request
@@ -885,7 +1188,7 @@ RUNTIME CONFIGURATION
 
     The run-level harness and provider are the default lane. An agent binding may add
     "lane": {"harness": "claude", "provider": "anthropic"} to run that node on another accepted
-    pair; git_delivery bindings cannot. --uniform-runtime-config applies one lane to every agent
+    pair; git_delivery and comment_delivery bindings cannot. --uniform-runtime-config applies one lane to every agent
     node. Named targets must advertise per-node lane support (openengine.node-runtime-lanes/v1), and
     a local run first checks that each lane's executable (codex, claude, or copilot) is on PATH.
 
@@ -893,14 +1196,15 @@ RUNTIME CONFIGURATION
     template-owned delivery binding.
 
     --uniform-runtime-config requires harness, provider, and model. It accepts optional size,
-    effort, sessionScope, and connections fields without nodes. Zeroshot expands that agent binding
+    effort, sessionScope, connections, activeMemory, and globalAgents fields without nodes.
+    Zeroshot expands that agent binding
     across every executable graph node and supplies graph-visible Git delivery bindings itself.
     Omitted connections reuse native local login for codex/openai, claude/anthropic,
     copilot/github, pi/anthropic, and pi/openai; other local lanes and contained targets derive
     their canonical connection requirements.
 
 ENVIRONMENT PREPARATION
-    For Docker or Cloud targets, pass --environment environment.json with a separate, flat JSON
+    For Docker or Platform targets, pass --environment environment.json with a separate, flat JSON
     definition (not a profile field or an "environment" wrapper):
 
       {
@@ -932,9 +1236,9 @@ ENVIRONMENT PREPARATION
 ### `zeroshot update`
 
 ```text
-Update this executable and managed agent skill to the newest canonical release.
+Update this executable and managed agent skills to the newest canonical release.
 
-Downloads the declared archive and agent skill from the latest GitHub Release, verifies their SHA256SUMS entries and the executable version, then replaces this executable and any unchanged Zeroshot-managed skill copies. User-edited skills are preserved and reported as conflicts. The executable's directory must be writable; Zeroshot does not elevate privileges.
+Downloads the declared archive and agent skills from the latest GitHub Release, verifies their SHA256SUMS entries and the executable version, then replaces this executable and any unchanged Zeroshot-managed skill copies. User-edited skills are preserved and reported as conflicts. The executable's directory must be writable; Zeroshot does not elevate privileges.
 
 Usage: zeroshot update
 
@@ -1157,15 +1461,17 @@ Print this message or the help of the given subcommand(s)
 Usage: zeroshot help [COMMAND]
 
 Commands:
+  memory             Initialize local Active Memory through the canonical skill
   acp                Serve one local Zeroshot profile as an experimental ACP agent over stdio
   ui                 Serve the local profile editor and live or recorded run history
   target             Manage named targets or serve a direct target
+  delegation         Manage user or organization machine delegations and API keys
   connection         Inspect and manage named runtime connections
   profile            Manage reusable graph/runtime profiles
   template           Inspect built-in graph templates
   plan               Validate, submit, and observe hosted merge plans
   run                Submit a graph run locally or to a named target
-  update             Update this executable and managed agent skill to the newest canonical release
+  update             Update this executable and managed agent skills to the newest canonical release
   list               List runs as JSON
   status             Read a run's current status as JSON
   watch              Follow a run's durable event stream as NDJSON

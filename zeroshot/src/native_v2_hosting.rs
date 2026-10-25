@@ -28,9 +28,9 @@ use crate::execution::process::HostedProcessPool;
 use crate::native_v2_admission::DeliveryPolicy;
 use crate::native_v2_candidate::{ProviderAccessPlacement, materialize_provider_access};
 use crate::native_v2_claude::ClaudeProcessEnvironment;
-use crate::native_v2_cloud::{NativeV2CloudController, NativeV2CloudError};
+use crate::native_v2_platform::{NativeV2PlatformController, NativeV2PlatformError};
 use crate::native_v2_pi::PiProcessEnvironment;
-use crate::native_v2_cloud::submission_digest;
+use crate::native_v2_platform::submission_digest;
 use crate::native_v2_target_authority::{
     NativeV2TargetAuthority, OperatorDiagnosticOutput, OperatorDiagnosticStore,
     TargetAuthorityError, TargetControllerFactory, TargetRunReceipt, TargetRunRequest,
@@ -40,7 +40,7 @@ use crate::v2_run_ledger::RunLedgerError;
 use crate::v2_run_ledger::sqlite::SqliteRunLedger;
 use crate::native_v2_supervisor::RunEnvironment;
 
-use allocator::{ProductionCapsuleAllocator, ProductionCapsuleConfig};
+use allocator::ProductionCapsuleAllocator;
 pub(crate) use connections::build_connection_resolver;
 
 /// Adds missing provider connection requirements for each agent's effective lane.
@@ -69,6 +69,8 @@ pub async fn build_production_target_authority(
 /// Host-owned non-secret capabilities used to compose one installed target.
 #[derive(Clone)]
 pub struct ProductionHostingConfig {
+    /// A host-owned namespace. Platform embedders select their own tenant-scoped storage.
+    pub memory_storage: Option<PathBuf>,
     /// Private diagnostics collection; the host owns the receiver and durable storage.
     pub operator_diagnostic_output: Option<OperatorDiagnosticOutput>,
     pub workspace_storage: Option<Arc<dyn HostedWorkspaceStorage>>,
@@ -121,31 +123,20 @@ impl ProductionTargetControllerFactory {
 
     pub async fn create_controller(
         &self,
-    ) -> Result<Arc<NativeV2CloudController>, ProductionHostingError> {
+    ) -> Result<Arc<NativeV2PlatformController>, ProductionHostingError> {
         let root = prepare_storage_root(&self.config.storage_root)?;
         let ledger_path = root.join("runs.sqlite3");
         prepare_production_ledger(&ledger_path)?;
         let ledger: Arc<dyn RunLedger> = Arc::new(
             SqliteRunLedger::open(ledger_path).map_err(|_| ProductionHostingError::Ledger)?,
         );
-        let allocator = Arc::new(ProductionCapsuleAllocator::new(ProductionCapsuleConfig {
-            workspace_storage: self.config.workspace_storage.clone(),
-            storage_root: root,
-            copilot_executable: self.config.copilot_executable.clone(),
-            codex_executable: self.config.codex_executable.clone(),
-            claude_executable: self.config.claude_executable.clone(),
-            pi_executable: self.config.pi_executable.clone(),
-            pi_prefix_arguments: self.config.pi_prefix_arguments.clone(),
-            pi_process_environment: self.config.pi_process_environment.clone(),
-            claude_prefix_arguments: self.config.claude_prefix_arguments.clone(),
-            claude_process_environment: self.config.claude_process_environment.clone(),
-            executable_search_path: self.config.executable_search_path.clone(),
-            git_program: self.config.git_program.clone(),
-            gh_program: self.config.gh_program.clone(),
-            process_pool: self.config.process_pool,
-            operator_diagnostics: self.operator_diagnostics.clone(),
-        })?);
-        let controller = NativeV2CloudController::new_with_delivery_policy(
+        let mut capsule_config = self.config.as_ref().clone();
+        capsule_config.storage_root = root;
+        let allocator = Arc::new(ProductionCapsuleAllocator::new(
+            Arc::new(capsule_config),
+            self.operator_diagnostics.clone(),
+        )?);
+        let controller = NativeV2PlatformController::new_with_delivery_policy(
             ledger,
             allocator,
             DeliveryPolicy::Optional,
@@ -159,6 +150,40 @@ impl ProductionTargetControllerFactory {
 
 #[async_trait]
 impl TargetControllerFactory for ProductionTargetControllerFactory {
+    fn supports_comment_delivery(&self) -> bool {
+        true
+    }
+
+    fn supports_task_resolution(
+        &self,
+        authentication: openengine_cluster_protocol::TargetAuthentication,
+    ) -> bool {
+        !matches!(
+            authentication,
+            openengine_cluster_protocol::TargetAuthentication::HostedOauth
+        )
+    }
+
+    async fn resolve_task(
+        &self,
+        request: crate::native_v2_review::ReviewResolutionRequest,
+        github_token: Option<String>,
+    ) -> Result<crate::native_v2_review::PreparedReview, TargetAuthorityError> {
+        let token = github_token.ok_or_else(|| {
+            TargetAuthorityError::invalid(
+                "review resolution requires an explicit GitHub credential",
+            )
+        })?;
+        crate::native_v2_review::resolve_review(request, &token)
+            .await
+            .map_err(|error| match error {
+                crate::native_v2_review::ReviewResolveError::Transport => {
+                    TargetAuthorityError::unavailable(error.to_string())
+                }
+                _ => TargetAuthorityError::invalid(error.to_string()),
+            })
+    }
+
     fn supports_workspace_recovery(&self) -> bool {
         true
     }
@@ -171,7 +196,7 @@ impl TargetControllerFactory for ProductionTargetControllerFactory {
         true
     }
 
-    async fn create(&self) -> Result<Arc<NativeV2CloudController>, TargetAuthorityError> {
+    async fn create(&self) -> Result<Arc<NativeV2PlatformController>, TargetAuthorityError> {
         self.create_controller()
             .await
             .map_err(|error| TargetAuthorityError::unavailable(error.to_string()))
@@ -179,7 +204,7 @@ impl TargetControllerFactory for ProductionTargetControllerFactory {
 
     async fn submit(
         &self,
-        controller: &NativeV2CloudController,
+        controller: &NativeV2PlatformController,
         request: TargetRunRequest,
     ) -> Result<TargetRunReceipt, TargetAuthorityError> {
         let TargetRunRequest {
@@ -196,7 +221,7 @@ impl TargetControllerFactory for ProductionTargetControllerFactory {
         if let Some(receipt) = controller
             .resolve_submission(&submission.submission_key, &digest)
             .await
-            .map_err(project_cloud_error)?
+            .map_err(project_platform_error)?
         {
             return Ok(TargetRunReceipt {
                 run_id: receipt.run_id,
@@ -214,13 +239,13 @@ impl TargetControllerFactory for ProductionTargetControllerFactory {
             .submit_with_exact_environment_and_source_credentials(
                 RunSubmitParams { run_id, submission },
                 environment,
-                crate::native_v2_cloud::RunSourceCredentials {
+                crate::native_v2_platform::RunSourceCredentials {
                     github_token,
                     git_credentials,
                 },
             )
             .await
-            .map_err(project_cloud_error)?;
+            .map_err(project_platform_error)?;
         Ok(TargetRunReceipt {
             run_id: receipt.run_id,
         })
@@ -239,16 +264,16 @@ fn prepare_contained_submission(
         .map_err(|error| TargetAuthorityError::invalid(error.to_string()))
 }
 
-fn project_cloud_error(error: NativeV2CloudError) -> TargetAuthorityError {
+fn project_platform_error(error: NativeV2PlatformError) -> TargetAuthorityError {
     let message = error.to_string();
     match error {
-        NativeV2CloudError::Admission(_)
-        | NativeV2CloudError::Environment(_)
-        | NativeV2CloudError::SubmissionIdentity
-        | NativeV2CloudError::Ledger(RunLedgerError::AdmittedRunTooLarge) => {
+        NativeV2PlatformError::Admission(_)
+        | NativeV2PlatformError::Environment(_)
+        | NativeV2PlatformError::SubmissionIdentity
+        | NativeV2PlatformError::Ledger(RunLedgerError::AdmittedRunTooLarge) => {
             TargetAuthorityError::invalid(message)
         }
-        NativeV2CloudError::Ledger(
+        NativeV2PlatformError::Ledger(
             RunLedgerError::SubmissionConflict { .. } | RunLedgerError::RunIdConflict,
         ) => TargetAuthorityError::conflict(message),
         _ => TargetAuthorityError::unavailable(message),
@@ -358,6 +383,7 @@ fn set_traversable_directory(_path: &std::path::Path) -> Result<(), std::io::Err
 impl Default for ProductionHostingConfig {
     fn default() -> Self {
         Self {
+            memory_storage: None,
             operator_diagnostic_output: None,
             workspace_storage: None,
             storage_root: PathBuf::from("/var/lib/zeroshot/native-v2"),

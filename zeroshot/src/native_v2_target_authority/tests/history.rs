@@ -1,4 +1,4 @@
-use openengine_cluster_protocol::{CodexProvider, RunSize, RuntimePlan};
+use openengine_cluster_protocol::RunSize;
 use super::*;
 use openengine_cluster_protocol::{
     NodeName, NodeRuntimeBinding, PositiveInteger, Sha256Digest, TerminalResult,
@@ -24,9 +24,9 @@ struct HistoryFactory {
 
 #[async_trait]
 impl TargetControllerFactory for HistoryFactory {
-    async fn create(&self) -> Result<Arc<NativeV2CloudController>, TargetAuthorityError> {
+    async fn create(&self) -> Result<Arc<NativeV2PlatformController>, TargetAuthorityError> {
         self.creates.fetch_add(1, Ordering::SeqCst);
-        NativeV2CloudController::new(self.ledger.clone(), Arc::new(NoAllocation))
+        NativeV2PlatformController::new(self.ledger.clone(), Arc::new(NoAllocation))
             .await
             .map(Arc::new)
             .map_err(|error| TargetAuthorityError::unavailable(error.to_string()))
@@ -34,7 +34,7 @@ impl TargetControllerFactory for HistoryFactory {
 
     async fn submit(
         &self,
-        _controller: &NativeV2CloudController,
+        _controller: &NativeV2PlatformController,
         _request: TargetRunRequest,
     ) -> Result<TargetRunReceipt, TargetAuthorityError> {
         Err(TargetAuthorityError::invalid(
@@ -111,17 +111,16 @@ impl HistoryServer {
             .materialize(TemplateDelivery::None)
             .assert_value();
         submission.initial_input = json!({"task":"Inspect native history"});
-        submission.runtime = RuntimePlan::Codex {
-            provider: CodexProvider::OpenAi,
-            size: RunSize::Small,
-            nodes: BTreeMap::from([(
+        submission.runtime = crate::native_v2_candidate::test_support::codex_runtime(
+            RunSize::Small,
+            BTreeMap::from([(
                 NodeName::new("worker").assert_value(),
                 serde_json::from_value::<NodeRuntimeBinding>(json!({
                     "kind":"agent", "model":"test-model", "sessionScope":"execution",
                 }))
                 .assert_value(),
             )]),
-        };
+        );
         let admitted = NativeV2Admission.admit(submission).await.assert_value();
         self.factory
             .ledger

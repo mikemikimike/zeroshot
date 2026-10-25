@@ -1,3 +1,7 @@
+---
+description: "RuntimePlan selects execution settings and supplies bindings for graph nodes. It names models and connection fields without containing secrets."
+---
+
 # RuntimePlan
 
 A `RuntimePlan` says how each executable node in a graph runs. It selects the run size and a default
@@ -12,14 +16,19 @@ machine-readable contract.
 
 ## Document fields
 
-`RuntimePlan` is a closed JSON object. All four fields are required, and unknown fields are rejected.
+`RuntimePlan` is a closed JSON object. The following four fields are required; unknown fields are rejected.
 
 | Field      | Value                                                                              |
 | ---------- | ---------------------------------------------------------------------------------- |
-| `harness`  | Harness of the default lane: `codex`, `claude`, `copilot`, or `pi`                |
+| `harness`  | Harness of the default lane: `codex`, `claude`, `copilot`, or `pi`                 |
 | `provider` | Provider of the default lane, supported by the selected harness                    |
 | `size`     | `small`, `medium`, or `large`                                                      |
 | `nodes`    | Object mapping each executable graph node name to a [node binding](#node-bindings) |
+
+Optional `activeMemory` controls repository and graph recall/collection independently, and
+`globalAgents.postmortem` configures the built-in after-run specialists. Both default to enabled
+on local CLI runs and direct targets. The same sections are accepted by uniform runtime files.
+See [Active Memory](../guides/active-memory.md) for budgets, provider inheritance and opt-out examples.
 
 `harness` and `provider` form the default lane. Every agent node runs on it unless its binding
 carries its own [`lane`](#per-node-lanes). `size` applies to the whole run. Model, effort, session
@@ -82,7 +91,8 @@ rather than a bypass argument.
 
 ## Node bindings
 
-`kind` selects one of two binding shapes. Fields that belong to the other kind are rejected.
+`kind` selects an agent, Git delivery, or comment delivery binding. Fields belonging to another
+kind are rejected.
 
 ### `agent`
 
@@ -134,10 +144,22 @@ software-change --pr` prints a delivery node with the current contract.
 
 A graph can contain at most one delivery node, and no other executable node may run in parallel with
 it, either as a `par` sibling or inside a `map` that can have more than one item. A hosting service
-may require exactly one delivery node; Zeroshot Cloud quick runs require one. See
+may require exactly one delivery node; Zeroshot Platform quick runs require one. See
 [concurrent workspace changes](../concepts/execution.md#concurrent-workspace-changes).
 
 `ignore` skips pull-request discussion. CI, conflict, freshness, and merge-policy checks still apply.
+
+### `comment_delivery`
+
+This binding accepts only `kind: "comment_delivery"` and optional `connections`. It has no model,
+lane, effort, or provider session. It binds a verifier using `builtin.comment-delivery.post@1`
+with that worker's fixed input/output, signal, and diagnostic contracts and no authored instructions.
+
+The node reads a required discussion `url` and report `body`, plus optional captured `reviewScope`.
+Its URL and present scope bind directly from required caller input; they cannot change before
+publication. A graph permits one trusted delivery node, and comment publication must follow all
+other executable work and cleanup, outside loops and maps. The exact confirmed receipt must appear
+in terminal output. See [Review an issue or pull request](../guides/review.md).
 
 ## Per-node lanes
 
@@ -176,7 +198,7 @@ model identifier and the reviewers need Anthropic ones.
 
 - `lane` accepts the same pairs as the run level, listed in
   [Harness and provider](#harness-and-provider). An invalid pair is rejected when the plan is read.
-- A `git_delivery` binding cannot carry a `lane`.
+- A `git_delivery` or `comment_delivery` binding cannot carry a `lane`.
 - A `lane` equal to the run-level pair is accepted, and the node runs exactly as it would without
   one. It is still a `lane` field, so the [target support](#target-support) check applies to it and
   older binaries reject it. Omit `lane` when a node should use the default lane.
@@ -303,21 +325,28 @@ authored scopes; use `node_instance` on `worker` in an exact plan to retain its 
 When using the updated template with an older exact runtime config, remove its `review_repair`
 and `delivery_repair` bindings. Existing saved profiles keep their stored graph and bindings.
 
+For `auto-research`, an omitted uniform `sessionScope` defaults to `node_instance` for `explorer`,
+`synthesizer`, `challenger`, and `researcher`, and `execution` for `reviewer`. The normal round has
+these five agent bindings; `--push` adds `checkpoint_delivery`. Exact plans must supply these node
+names and their desired scopes. Existing saved profiles keep their stored topology and runtime.
+
 A uniform configuration applies one lane to every agent node. Neither `--uniform-runtime-config` nor
 the Python SDK's `UniformRuntime` can express [per-node lanes](#per-node-lanes); use an exact
 `--runtime-config` or an opaque `RuntimePlan` instead.
 
 ## Template delivery bindings
 
-Built-in templates own their delivery nodes. With `software-change`, `--push`, `--pr`, and `--ship`
-add a delivery verifier named `deliver`. The existing `worker` handles delivery repairs. With `auto-research`, `--push`
-adds `checkpoint_delivery` plus the agent nodes `checkpoint_manifest` and `checkpoint_audit`.
+Built-in templates own their delivery nodes. `software-change` defaults to a pull-request delivery
+verifier named `deliver`; `--push` and `--ship` select push and merge delivery, and `--delivery none`
+omits delivery. The existing `worker` handles delivery repairs. With
+`auto-research`, `--push` adds only the trusted `checkpoint_delivery` node; the researcher and
+reviewer already handle the round records and delivery description.
 `single-worker` has no delivery modes.
 
 The CLI inserts a `git_delivery` binding with no forge connection for push, or
 `{"github": ["GH_TOKEN"]}` for PR and merge. Git transport uses the selected
 [source credentials](../concepts/targets.md#source-and-delivery-credentials).
-`--no-pr-feedback` (requires `--pr` or `--ship`) sets `pullRequestFeedback` to `ignore`.
+`--no-pr-feedback` (requires pull-request or merge delivery) sets `pullRequestFeedback` to `ignore`.
 
 A uniform configuration binds the added agent nodes too. An exact `--runtime-config` must bind
 all agent nodes itself. Software-change uses `worker`, `acceptance`, and `code` with every delivery

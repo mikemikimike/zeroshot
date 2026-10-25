@@ -67,7 +67,7 @@ impl<C> NamedTargetCliBackend<C> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RunLocation {
     Direct,
-    Cloud,
+    Platform,
     Task,
 }
 
@@ -92,7 +92,7 @@ where
         Ok(match status {
             None => RunLocation::Direct,
             Some(status) if task_is_active(&status.status) => RunLocation::Task,
-            Some(_) => RunLocation::Cloud,
+            Some(_) => RunLocation::Platform,
         })
     }
 }
@@ -128,12 +128,48 @@ where
     type Logs = BoxedSubscription<RunLogEventNotification>;
     type Attach = BoxedSubscription<RunAttachEventNotification>;
 
+    async fn review_cache_namespace(
+        &self,
+        target: Option<&str>,
+    ) -> Result<Option<String>, NativeV2CliError> {
+        self.connector
+            .review_cache_namespace(require_named_target(target)?)
+            .await
+    }
+
+    async fn resolve_review(
+        &self,
+        target: Option<&str>,
+        request: crate::native_v2_review::ReviewResolutionRequest,
+        runtime: &openengine_cluster_protocol::RuntimePlan,
+    ) -> Result<crate::native_v2_review::PreparedReview, NativeV2CliError> {
+        self.connector
+            .resolve_review(require_named_target(target)?, request, runtime)
+            .await
+    }
+
     async fn target_add(&self, request: TargetAdd) -> Result<(), NativeV2CliError> {
         self.connector.add(request).await
     }
 
     async fn target_login(&self, name: &str) -> Result<(), NativeV2CliError> {
         self.connector.login(name).await
+    }
+
+    async fn default_resource_scope(
+        &self,
+        target: Option<&str>,
+    ) -> Result<openengine_cluster_protocol::ConnectionScope, NativeV2CliError> {
+        self.connector
+            .default_resource_scope(require_named_target(target)?)
+            .await
+    }
+
+    async fn delegation(
+        &self,
+        command: crate::native_v2_cli::DelegationCommand,
+    ) -> Result<crate::native_v2_cli::DelegationResult, NativeV2CliError> {
+        self.connector.delegation(command).await
     }
 
     async fn connection_list(
@@ -304,7 +340,7 @@ where
     ) -> Result<Self::Watch, NativeV2CliError> {
         let target = require_named_target(target)?;
         let params = match self.run_location(target, &params.run_id).await? {
-            RunLocation::Cloud => {
+            RunLocation::Platform => {
                 return self
                     .connector
                     .hosted_run_watch(target, params)
@@ -335,7 +371,7 @@ where
     ) -> Result<Self::Logs, NativeV2CliError> {
         let target = require_named_target(target)?;
         let params = match self.run_location(target, &params.run_id).await? {
-            RunLocation::Cloud => {
+            RunLocation::Platform => {
                 return self
                     .connector
                     .hosted_run_logs(target, params)
@@ -379,7 +415,7 @@ where
     ) -> Result<CliRunForceResult, NativeV2CliError> {
         let target = require_named_target(target)?;
         match self.run_location(target, &params.run_id).await? {
-            RunLocation::Cloud => {
+            RunLocation::Platform => {
                 return self
                     .connector
                     .hosted_run_force(target, params)

@@ -6,6 +6,22 @@ use openengine_cluster_testkit::assertions::{AssertError, AssertValue};
 
 use super::*;
 
+#[test]
+fn target_api_keys_cannot_be_collected_by_a_runtime_connection_requirement() {
+    let fields = ["ZEROSHOT_API_KEY", "zeroshot_api_key", "OPENAI_API_KEY"]
+        .into_iter()
+        .map(|name| EnvironmentVariableName::new(name).assert_value())
+        .collect();
+    let selected = select_connection_requirements(
+        BTreeMap::from([(ConnectionKey::new("provider").assert_value(), fields)]),
+        |_| Some(OsString::from("must-stay-private")),
+    )
+    .assert_value();
+    let values = selected.values().next().assert_value().as_map();
+    assert_eq!(values.len(), 1);
+    assert!(values.contains_key(&EnvironmentVariableName::new("OPENAI_API_KEY").assert_value()));
+}
+
 fn uniform(harness: UniformHarness, provider: UniformProvider) -> UniformRuntimePlan {
     UniformRuntimePlan {
         harness,
@@ -15,6 +31,49 @@ fn uniform(harness: UniformHarness, provider: UniformProvider) -> UniformRuntime
         effort: None,
         session_scope: None,
         connections: None,
+        active_memory: Default::default(),
+        global_agents: Default::default(),
+    }
+}
+
+#[test]
+fn uniform_runtime_preserves_authored_memory_controls_for_every_harness() {
+    let graph = BuiltinGraphTemplate::SingleWorker
+        .materialize(TemplateDelivery::None)
+        .assert_value();
+    for (harness, provider) in [
+        ("codex", "openai"),
+        ("claude", "anthropic"),
+        ("copilot", "github"),
+        ("pi", "bedrock"),
+    ] {
+        let authored = serde_json::json!({
+            "harness": harness,
+            "provider": provider,
+            "model": "provider-owned-model",
+            "activeMemory": {"repository": false, "graph": true, "budgetBytes": 512},
+            "globalAgents": {"postmortem": {"enabled": false, "sourceNode": "worker", "timeoutMs": 1000}}
+        });
+        let plan: UniformRuntimePlan = serde_json::from_value(authored.clone()).assert_value();
+        let runtime = plan
+            .materialize(&graph, PullRequestFeedback::Consider, None)
+            .assert_value();
+        let serialized = serde_json::to_value(runtime).assert_value();
+        assert_eq!(
+            serialized["activeMemory"], authored["activeMemory"],
+            "{harness}"
+        );
+        assert_eq!(
+            serialized["globalAgents"], authored["globalAgents"],
+            "{harness}"
+        );
+
+        let defaults: UniformRuntimePlan = serde_json::from_value(serde_json::json!({
+            "harness": harness, "provider": provider, "model": "provider-owned-model"
+        }))
+        .assert_value();
+        assert_eq!(defaults.active_memory, ActiveMemoryConfig::default());
+        assert_eq!(defaults.global_agents, GlobalAgentsConfig::default());
     }
 }
 
@@ -170,6 +229,36 @@ fn software_change_session_defaults_preserve_explicit_runtime_choices() {
 }
 
 #[test]
+fn auto_research_session_defaults_preserve_explicit_runtime_choices() {
+    let template = BuiltinGraphTemplate::AutoResearch;
+    let graph = template.materialize(TemplateDelivery::None).assert_value();
+    for override_scope in [
+        None,
+        Some(SessionScope::Execution),
+        Some(SessionScope::NodeInstance),
+    ] {
+        let mut uniform = uniform(UniformHarness::Codex, UniformProvider::OpenAi);
+        uniform.session_scope = override_scope;
+        let runtime = uniform
+            .materialize(&graph, PullRequestFeedback::Consider, Some(template))
+            .assert_value();
+        for role in [
+            "explorer",
+            "synthesizer",
+            "challenger",
+            "researcher",
+            "reviewer",
+        ] {
+            let expected = override_scope.unwrap_or_else(|| template.default_session_scope(role));
+            assert!(
+                matches!(runtime.nodes().get(&NodeName::new(role).assert_value()),
+                Some(NodeRuntimeBinding::Agent { session_scope, .. }) if *session_scope == expected)
+            );
+        }
+    }
+}
+
+#[test]
 fn wave6_cli_contract_connection_selection_and_json_errors_keep_precedence() {
     let field = EnvironmentVariableName::new("OPENAI_API_KEY").assert_value();
     let requirements: RunConnectionRequirements = BTreeMap::from([(
@@ -254,7 +343,7 @@ async fn wave8_cli_contract_validate_only_preflight_materializes_without_backend
             },
             runtime: RunRuntime::Exact(runtime),
         },
-        input,
+        input: input.into(),
         repository: None,
         branch: None,
         revision: None,

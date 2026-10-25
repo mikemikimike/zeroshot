@@ -78,7 +78,7 @@ pub enum RunRuntimeExit {
     RuntimeLost,
 }
 
-/// Optional runtime cleanup seam used by the cloud controller.
+/// Optional runtime cleanup seam used by the platform controller.
 ///
 /// Returning success is an acknowledgement that the disposable runtime is gone. The supervisor
 /// never appends a terminal event before this acknowledgement.
@@ -125,6 +125,7 @@ pub struct NativeV2Supervisor {
     live_output: Option<Arc<dyn LiveOutputRegistrar>>,
     runtime_cleanup: Option<Arc<dyn RunRuntimeCleanup>>,
     checkpoints: Option<Arc<dyn checkpoints::RunCheckpointStore>>,
+    postmortem: Option<Arc<dyn crate::active_memory::postmortem::RunPostmortem>>,
     runtime_lost: Arc<AtomicBool>,
     force_requested: Arc<AtomicBool>,
     resolution_stop: watch::Sender<bool>,
@@ -148,6 +149,7 @@ impl NativeV2Supervisor {
             live_output: None,
             runtime_cleanup: None,
             checkpoints: None,
+            postmortem: None,
             runtime_lost: Arc::new(AtomicBool::new(false)),
             force_requested: Arc::new(AtomicBool::new(false)),
             resolution_stop: watch::channel(false).0,
@@ -182,6 +184,15 @@ impl NativeV2Supervisor {
         self
     }
 
+    #[must_use]
+    pub fn with_postmortem(
+        mut self,
+        postmortem: Option<Arc<dyn crate::active_memory::postmortem::RunPostmortem>>,
+    ) -> Self {
+        self.postmortem = postmortem;
+        self
+    }
+
     /// Drives the run until it reaches its durable terminal result.
     pub async fn drive(&self) -> Result<TerminalResult, NativeV2SupervisorError> {
         let _turn = self.drive_turn.lock().await;
@@ -193,23 +204,8 @@ impl NativeV2Supervisor {
 
     async fn initialize(&self) -> Result<Initialization, NativeV2SupervisorError> {
         let mut stored = self.load().await?;
-        if let Some(terminal) = stored.snapshot.terminal {
+        if let Some(terminal) = self.initialized_terminal(&stored).await? {
             return Ok(Initialization::Terminal(terminal));
-        }
-        if self.force_requested.load(Ordering::Acquire)
-            || stored.snapshot.force_stop_requested
-            || stored.snapshot.phase == RunPhase::Stopping
-        {
-            return self
-                .terminalize_force(&mut JoinSet::new())
-                .await
-                .map(Initialization::Terminal);
-        }
-        if stored.snapshot.active_executions().next().is_some() {
-            return self
-                .terminalize_lost(&mut JoinSet::new())
-                .await
-                .map(Initialization::Terminal);
         }
         if stored.snapshot.phase == RunPhase::Admitted {
             stored.snapshot = self
@@ -227,6 +223,31 @@ impl NativeV2Supervisor {
             instructions: catalog.instructions,
             admitted: stored.admitted,
         })))
+    }
+
+    async fn initialized_terminal(
+        &self,
+        stored: &StoredRun,
+    ) -> Result<Option<TerminalResult>, NativeV2SupervisorError> {
+        if let Some(terminal) = stored.snapshot.terminal.clone() {
+            return Ok(Some(terminal));
+        }
+        if let Some(primary) = &stored.snapshot.primary_graph {
+            return self
+                .finish_reduction(&stored.admitted, &stored.snapshot, primary.result.clone())
+                .await
+                .map(Some);
+        }
+        if self.force_requested.load(Ordering::Acquire)
+            || stored.snapshot.force_stop_requested
+            || stored.snapshot.phase == RunPhase::Stopping
+        {
+            return self.terminalize_force(&mut JoinSet::new()).await.map(Some);
+        }
+        if stored.snapshot.active_executions().next().is_some() {
+            return self.terminalize_lost(&mut JoinSet::new()).await.map(Some);
+        }
+        Ok(None)
     }
 
     async fn drive_program(
@@ -326,8 +347,9 @@ impl NativeV2Supervisor {
         snapshot: &RunSnapshot,
         terminal: TerminalResult,
     ) -> Result<TerminalResult, NativeV2SupervisorError> {
-        let terminal =
-            enforce_delivery_terminal(self.delivery_policy, admitted, snapshot, terminal)?;
+        let terminal = self
+            .latch_primary_graph(admitted, snapshot, terminal)
+            .await?;
         self.runner.close_run(&self.run_id).await;
         let succeeded = matches!(terminal, TerminalResult::Succeeded { .. });
         self.finish_failed_checkpoints(succeeded, snapshot).await?;
@@ -339,6 +361,48 @@ impl NativeV2Supervisor {
         self.cleanup_runtime(exit).await?;
         let terminal = self.append_terminal(terminal).await?;
         self.discard_successful_checkpoints(succeeded).await;
+        Ok(terminal)
+    }
+
+    async fn latch_primary_graph(
+        &self,
+        admitted: &AdmittedRun,
+        snapshot: &RunSnapshot,
+        terminal: TerminalResult,
+    ) -> Result<TerminalResult, NativeV2SupervisorError> {
+        let terminal = if let Some(primary) = &snapshot.primary_graph {
+            // Retrying finalization never starts optional model work a second time.
+            if primary.auxiliary_pending {
+                self.ledger
+                    .append(
+                        &self.run_id,
+                        vec![RunEvent::RunTokenUsageObserved { usage: None }],
+                    )
+                    .await?;
+            }
+            primary.result.clone()
+        } else {
+            let terminal =
+                enforce_delivery_terminal(self.delivery_policy, admitted, snapshot, terminal)?;
+            let auxiliary_pending = self.enabled_postmortem(admitted).is_some();
+            let latched = self
+                .ledger
+                .append(
+                    &self.run_id,
+                    vec![RunEvent::PrimaryGraphCompleted {
+                        result: terminal,
+                        auxiliary_pending,
+                    }],
+                )
+                .await?;
+            let terminal = latched
+                .snapshot
+                .primary_graph
+                .ok_or(NativeV2SupervisorError::InvalidState)?
+                .result;
+            self.run_postmortem(admitted, snapshot, &terminal).await?;
+            terminal
+        };
         Ok(terminal)
     }
 
@@ -454,8 +518,9 @@ fn enforce_delivery_terminal(
     snapshot: &RunSnapshot,
     terminal: TerminalResult,
 ) -> Result<TerminalResult, NativeV2SupervisorError> {
-    let requires_delivery_receipt =
-        policy == DeliveryPolicy::Required || sole_delivery_node(admitted).is_some();
+    let requires_delivery_receipt = policy == DeliveryPolicy::Required
+        || sole_delivery_node(admitted).is_some()
+        || crate::native_v2_admission::comment_node(&admitted.graph.root).is_some();
     let accepted = match &terminal {
         TerminalResult::Succeeded { output } if requires_delivery_receipt => {
             has_required_delivery_receipt(admitted, snapshot, output)
@@ -477,13 +542,13 @@ fn has_required_delivery_receipt(
     snapshot: &RunSnapshot,
     terminal_output: &Value,
 ) -> bool {
-    let Some((node, mode)) = sole_delivery_node(admitted) else {
-        return false;
-    };
-    let Some(source) = &admitted.source else {
-        return false;
-    };
-    let Ok(target) = crate::native_v2_delivery::source_target(source, mode) else {
+    let node = sole_delivery_node(admitted)
+        .map(|(node, _)| node)
+        .or_else(|| {
+            crate::native_v2_admission::comment_node(&admitted.graph.root)
+                .map(|node| node.name.clone())
+        });
+    let Some(node) = node else {
         return false;
     };
     let writers = writer_nodes(admitted);
@@ -529,8 +594,29 @@ fn has_required_delivery_receipt(
         }
     });
     writers_settled
-        && is_matching_success_receipt(output, mode, &target)
+        && receipt_matches_admission(admitted, output)
         && contains_exact_value(terminal_output, output)
+}
+
+fn receipt_matches_admission(admitted: &AdmittedRun, output: &Value) -> bool {
+    if let Some((_, mode)) = sole_delivery_node(admitted) {
+        return admitted
+            .source
+            .as_ref()
+            .and_then(|source| crate::native_v2_delivery::source_target(source, mode).ok())
+            .is_some_and(|target| is_matching_success_receipt(output, mode, &target));
+    }
+    let Ok(Some(comment)) = crate::native_v2_admission::admitted_comment_input(admitted) else {
+        return false;
+    };
+    crate::native_v2_comment_delivery::is_matching_success_receipt(
+        output,
+        &comment.url,
+        admitted
+            .source
+            .as_ref()
+            .map(|source| source.revision.as_str()),
+    )
 }
 
 fn contains_exact_value(container: &Value, expected: &Value) -> bool {
@@ -552,6 +638,7 @@ mod controller;
 mod environment;
 mod failure;
 pub(crate) mod logging;
+mod postmortem;
 mod runtime;
 // Read-only observation shares the supervisor's exact ledger-to-reducer normalization.
 pub(crate) use runtime::{durable_history, next_execution, next_node_instance};

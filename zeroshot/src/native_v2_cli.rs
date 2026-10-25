@@ -24,6 +24,9 @@ use openengine_cluster_protocol::{
 };
 use thiserror::Error;
 
+/// Process entry point for the product-owned native memory callback.
+#[doc(hidden)]
+pub use crate::active_memory::hooks::run_hook_helper as run_active_memory_hook;
 pub use crate::native_v2_contract::RunSubmissionIntent as TargetRunIntent;
 use crate::native_v2_admission::NativeV2AdmissionError;
 use crate::native_v2_supervisor::RunEnvironmentError;
@@ -55,7 +58,9 @@ pub use diagnostic::{ERROR_FORMAT_ENV, JSON_ERROR_FORMAT, NativeV2CliDiagnostic}
 #[path = "native_v2_cli/parser.rs"]
 mod parser;
 
+mod delegations;
 mod profiles;
+pub use delegations::{DelegationAction, DelegationCommand, DelegationResult};
 pub(crate) use profiles::LocalRunProfileStore;
 #[cfg(feature = "ui")]
 pub(crate) use profiles::{profile_revision, ProfileSaveConflict};
@@ -103,7 +108,7 @@ pub struct TargetServe {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConnectionRoute {
     pub target: Option<String>,
-    pub scope: ConnectionScope,
+    pub scope: Option<ConnectionScope>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -127,13 +132,35 @@ pub struct RunCommand {
     pub title: RunTitle,
     pub selection: RunSelection,
     pub environment: Option<RunEnvironmentInput>,
-    pub input: PathBuf,
+    pub input: RunInput,
     pub repository: Option<RunRepository>,
     pub branch: Option<SourceBranchId>,
     pub revision: Option<SourceRevisionId>,
     pub detach: bool,
     pub validate_only: bool,
     pub submission_key: Option<IdempotencyKey>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RunInput {
+    File(PathBuf),
+    TaskFrom(String),
+}
+
+impl From<PathBuf> for RunInput {
+    fn from(path: PathBuf) -> Self {
+        Self::File(path)
+    }
+}
+impl From<&str> for RunInput {
+    fn from(path: &str) -> Self {
+        Self::File(path.into())
+    }
+}
+impl From<String> for RunInput {
+    fn from(path: String) -> Self {
+        Self::File(path.into())
+    }
 }
 
 /// An explicit CLI source locator, before assigning a bounded repository identity.
@@ -282,6 +309,7 @@ pub struct RunLogsCommand {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeV2CliCommand {
+    Memory(MemoryCommand),
     Help(String),
     Version,
     Acp {
@@ -293,6 +321,7 @@ pub enum NativeV2CliCommand {
         name: String,
     },
     TargetServe(TargetServe),
+    Delegation(DelegationCommand),
     Ui {
         listen: SocketAddr,
         target: Option<String>,
@@ -347,6 +376,13 @@ pub enum NativeV2CliCommand {
 }
 
 impl NativeV2CliCommand {
+    fn is_management_operation(&self) -> bool {
+        self.is_connection_operation()
+            || self.is_profile_operation()
+            || self.is_target_operation()
+            || matches!(self, Self::Delegation(_))
+    }
+
     fn product_info(&self) -> Option<&str> {
         match self {
             Self::Help(help) => Some(help),
@@ -505,6 +541,42 @@ pub trait NativeV2CliBackend: Send + Sync {
 
     async fn target_add(&self, request: TargetAdd) -> Result<(), NativeV2CliError>;
     async fn target_login(&self, name: &str) -> Result<(), NativeV2CliError>;
+
+    /// A secret-free namespace separating retry snapshots by execution authority.
+    /// Backends without a stable identity leave snapshots uncached.
+    async fn review_cache_namespace(
+        &self,
+        target: Option<&str>,
+    ) -> Result<Option<String>, NativeV2CliError> {
+        Ok(target.is_none().then(|| "local".to_owned()))
+    }
+
+    async fn resolve_review(
+        &self,
+        _target: Option<&str>,
+        _request: crate::native_v2_review::ReviewResolutionRequest,
+        _runtime: &openengine_cluster_protocol::RuntimePlan,
+    ) -> Result<crate::native_v2_review::PreparedReview, NativeV2CliError> {
+        Err(NativeV2CliError::Target(
+            "target does not advertise task resolution".to_owned(),
+        ))
+    }
+
+    async fn default_resource_scope(
+        &self,
+        _target: Option<&str>,
+    ) -> Result<ConnectionScope, NativeV2CliError> {
+        Ok(ConnectionScope::User)
+    }
+
+    async fn delegation(
+        &self,
+        _command: DelegationCommand,
+    ) -> Result<DelegationResult, NativeV2CliError> {
+        Err(NativeV2CliError::Target(
+            "target does not advertise delegation management".to_owned(),
+        ))
+    }
 
     async fn connection_list(
         &self,
@@ -698,3 +770,6 @@ impl NativeV2CliError {
         matches!(self, Self::Disconnected | Self::TargetTransport { .. })
     }
 }
+
+mod memory;
+pub use memory::MemoryCommand;

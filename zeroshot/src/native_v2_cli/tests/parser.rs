@@ -451,7 +451,6 @@ fn explicit_template_delivery_is_parsed_and_validated_by_rust() {
         "Repair checkout",
         "--template",
         "software-change",
-        "--pr",
         "--no-pr-feedback",
         "--input",
         "input.json",
@@ -479,7 +478,11 @@ fn explicit_template_delivery_is_parsed_and_validated_by_rust() {
         "--no-pr-feedback",
     ]))
     .assert_error();
-    assert!(error.to_string().contains("requires --pr or --ship"));
+    assert!(
+        error
+            .to_string()
+            .contains("requires pull-request or merge delivery")
+    );
 }
 
 #[test]
@@ -819,7 +822,7 @@ fn target_add_requires_an_explicit_direct_flag() {
     let hosted = parse_native_v2_args(args(&[
         "target",
         "add",
-        "cloud",
+        "platform",
         "--url",
         "https://target.example",
     ]))

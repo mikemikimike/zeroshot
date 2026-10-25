@@ -66,14 +66,48 @@ impl TargetHttpControlAuthority {
 
 #[async_trait]
 impl TargetControlAuthority for TargetHttpControlAuthority {
+    fn redact_error(&self, error: TargetAuthorityError) -> TargetAuthorityError {
+        match &self.machine {
+            Some(machine) => error.redact_secret(&machine.api_key),
+            None => error,
+        }
+    }
+
+    async fn default_resource_scope(
+        &self,
+        target: &TargetRecord,
+    ) -> Result<openengine_cluster_protocol::ConnectionScope, TargetAuthorityError> {
+        self.machine_default_scope(target).await
+    }
+
+    async fn review_cache_namespace(
+        &self,
+        target: &TargetRecord,
+    ) -> Result<Option<String>, TargetAuthorityError> {
+        self.review_snapshot_namespace(target).await.map(Some)
+    }
+
+    async fn resolve_review(
+        &self,
+        target: &TargetRecord,
+        request: zeroshot_engine::native_v2_review::ReviewResolutionRequest,
+        runtime: &openengine_cluster_protocol::RuntimePlan,
+    ) -> Result<zeroshot_engine::native_v2_review::PreparedReview, TargetAuthorityError> {
+        self.resolve_review_request(target, request, runtime).await
+    }
+
     async fn discover(&self, target: &TargetRecord) -> Result<(), TargetAuthorityError> {
         match target.access {
             TargetAccess::Hosted { .. } => self.descriptors(target).await.map(|_| ()),
-            TargetAccess::Direct => self.controller_descriptor(target).await.map(|_| ()),
+            TargetAccess::Direct => {
+                self.require_no_machine_for_direct()?;
+                self.controller_descriptor(target).await.map(|_| ())
+            }
         }
     }
 
     async fn login(&self, target: &TargetRecord) -> Result<(), TargetAuthorityError> {
+        self.require_human_credential()?;
         let device_token = target
             .access
             .device_token()
@@ -81,14 +115,28 @@ impl TargetControlAuthority for TargetHttpControlAuthority {
         let mut cached = self.hosted_access.lock().await;
         *cached = None;
         let (auth, controller) = self.descriptors(target).await?;
+        let audience = if auth.delegations.is_some() {
+            super::ADMIN_AUDIENCE
+        } else {
+            &controller.audience
+        };
         let _refresh_guard = self.lock_refresh_family(&target.id).await?;
+        self.review_login_generation(&target.id, true)?;
         self.login_inner(HostedLogin {
             target_id: &target.id,
             device_token,
             auth: &auth,
-            audience: &controller.audience,
+            audience,
         })
         .await
+    }
+
+    async fn delegation(
+        &self,
+        target: &TargetRecord,
+        action: zeroshot_engine::native_v2_cli::DelegationAction,
+    ) -> Result<zeroshot_engine::native_v2_cli::DelegationResult, TargetAuthorityError> {
+        self.manage_delegation(target, action).await
     }
 
     async fn submit(

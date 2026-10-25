@@ -126,6 +126,8 @@ fn submission(graph: GraphSpec, nodes: BTreeMap<NodeName, NodeRuntimeBinding>) -
         graph,
         initial_input: json!({"items":[null]}),
         runtime: RuntimePlan::Claude {
+            active_memory: Default::default(),
+            global_agents: Default::default(),
             provider: ClaudeProvider::Anthropic,
             size: RunSize::Medium,
             nodes,
@@ -179,7 +181,9 @@ async fn admits_authored_loop_and_parallel_verifiers_without_defaulting_effort()
     for binding in admitted.runtime.nodes().values() {
         let effort = match binding {
             NodeRuntimeBinding::Agent { effort, .. } => Some(effort),
-            NodeRuntimeBinding::GitDelivery { .. } => None,
+            NodeRuntimeBinding::GitDelivery { .. } | NodeRuntimeBinding::CommentDelivery { .. } => {
+                None
+            }
         };
         let effort = effort.assert_value_with("fixture has only agent bindings");
         assert_eq!(*effort, None);
@@ -354,6 +358,8 @@ async fn admits_bedrock_for_both_harnesses_and_preserves_provider_owned_models()
         graph: graph.clone(),
         initial_input: json!({"items":[null]}),
         runtime: RuntimePlan::Codex {
+            active_memory: Default::default(),
+            global_agents: Default::default(),
             provider: CodexProvider::Bedrock,
             size: RunSize::Small,
             nodes: BTreeMap::from([(
@@ -553,3 +559,6 @@ async fn environment_name_limit_counts_distinct_names_across_nodes_hooks_and_var
         assert_eq!(NativeV2Admission.admit(request).await.map(|_| ()), expected);
     }
 }
+
+#[path = "tests/comments.rs"]
+mod comments;

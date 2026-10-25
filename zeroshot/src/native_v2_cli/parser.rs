@@ -3,7 +3,12 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
-/// Run multi-agent graphs locally or on named Zeroshot targets.
+#[path = "parser/delegations.rs"]
+mod delegations;
+use delegations::DelegationCliCommand;
+
+/// Enforce your team's QA process on coding agents: run the graph you define locally or on named
+/// Zeroshot targets.
 ///
 /// Single-result commands write JSON. Foreground `run`, `watch`, `logs`, and `attach` stream
 /// newline-delimited JSON (NDJSON).
@@ -25,36 +30,33 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum CliCommand {
-    /// Serve one local Zeroshot profile as an experimental ACP agent over stdio.
-    ///
-    /// The MVP supports one active session and text prompts. The profile must accept one task
-    /// string and return one response string from every success node. It supports local Codex or
-    /// Claude node-instance sessions, without maps, delivery, connections, MCP, or session reload.
-    Acp(AcpArgs),
-
-    /// Serve the local profile editor and live or recorded run history.
-    ///
-    /// Open the printed /ui/ URL. Profiles always use the CLI's local store. Run history uses the
-    /// local controller unless --target selects a configured target. Ctrl-C stops the UI
-    /// server; active runs continue.
-    Ui {
-        /// Loopback address for the local UI.
-        #[arg(long, default_value = "127.0.0.1:4173")]
-        listen: SocketAddr,
-
-        /// Read run history from this configured target. Profiles remain local.
-        #[arg(long, value_name = "NAME")]
-        target: Option<String>,
+    /// Initialize local Active Memory through the canonical skill.
+    Memory {
+        #[command(subcommand)]
+        command: super::MemoryCommand,
     },
+
+    #[command(flatten)]
+    Interface(InterfaceCommand),
 
     /// Manage named targets or serve a direct target.
     ///
-    /// The built-in `cloud` target points to https://api.cloud.zeroshot.sh.
-    /// Run `zeroshot target login cloud` to sign in.
-    /// See https://cloud.zeroshot.sh/docs for Cloud setup.
+    /// The built-in `platform` target points to https://api.cloud.zeroshot.sh.
+    /// Run `zeroshot target login platform` to sign in.
+    /// For unattended access, set ZEROSHOT_API_KEY instead of logging in.
+    /// See https://cloud.zeroshot.sh/docs for Platform setup.
     Target {
         #[command(subcommand)]
         command: TargetCommand,
+    },
+
+    /// Manage user or organization machine delegations and API keys.
+    ///
+    /// Requires human login. Set ZEROSHOT_API_KEY for unattended target commands;
+    /// set ZEROSHOT_ORGANIZATION to select an organization with a user-owned key.
+    Delegation {
+        #[command(subcommand)]
+        command: DelegationCliCommand,
     },
 
     /// Inspect and manage named runtime connections.
@@ -101,6 +103,31 @@ enum CliCommand {
     Utility(UtilityCommand),
 }
 
+#[derive(Debug, Subcommand)]
+enum InterfaceCommand {
+    /// Serve one local Zeroshot profile as an experimental ACP agent over stdio.
+    ///
+    /// The MVP supports one active session and text prompts. The profile must accept one task
+    /// string and return one response string from every success node. It supports local Codex or
+    /// Claude node-instance sessions, without maps, delivery, connections, MCP, or session reload.
+    Acp(AcpArgs),
+
+    /// Serve the local profile editor and live or recorded run history.
+    ///
+    /// Open the printed /ui/ URL. Profiles always use the CLI's local store. Run history uses the
+    /// local controller unless --target selects a configured target. Ctrl-C stops the UI
+    /// server; active runs continue.
+    Ui {
+        /// Loopback address for the local UI.
+        #[arg(long, default_value = "127.0.0.1:4173")]
+        listen: SocketAddr,
+
+        /// Read run history from this configured target. Profiles remain local.
+        #[arg(long, value_name = "NAME")]
+        target: Option<String>,
+    },
+}
+
 #[derive(Debug, Args)]
 struct AcpArgs {
     /// Local profile exposed by this agent process, in local:NAME form.
@@ -110,9 +137,9 @@ struct AcpArgs {
 
 #[derive(Debug, Subcommand)]
 enum UtilityCommand {
-    /// Update this executable and managed agent skill to the newest canonical release.
+    /// Update this executable and managed agent skills to the newest canonical release.
     ///
-    /// Downloads the declared archive and agent skill from the latest GitHub Release, verifies
+    /// Downloads the declared archive and agent skills from the latest GitHub Release, verifies
     /// their SHA256SUMS entries and the executable version, then replaces this executable and any
     /// unchanged Zeroshot-managed skill copies. User-edited skills are preserved and reported as
     /// conflicts. The executable's directory must be writable; Zeroshot does not elevate
@@ -181,7 +208,7 @@ The JSON manifest is strict and self-contained:
 Every run uses the same source and profile. The profile must contain exactly one current Git merge delivery node;
 pull-request delivery is rejected. Agent bindings must not declare `GH_TOKEN`; only the Git delivery
 binding may declare it. `needs` gates readiness but does not pass output between runs.
-Cloud assigns every run ID atomically at submission. After a node's dependencies succeed, Cloud
+Platform assigns every run ID atomically at submission. After a node's dependencies succeed, Platform
 materializes it against an exact source revision. Once materialization completes, `readyAt` is set
 and the node's queue deadline is the earlier of `expiresAt` and seven days after `readyAt`.
 `expiresAt` must be in the future and no more than
@@ -268,9 +295,9 @@ struct ConnectionRouteArgs {
     #[arg(long, value_name = "NAME")]
     target: Option<String>,
 
-    /// Select user- or organization-scoped connections.
-    #[arg(long, value_enum, default_value_t)]
-    scope: ConnectionScopeArg,
+    /// Connection scope. Defaults to the authenticated owner's scope.
+    #[arg(long, value_enum)]
+    scope: Option<ConnectionScopeArg>,
 }
 
 #[derive(Debug, Args)]
@@ -375,11 +402,17 @@ enum TemplateName {
 
     /// Research with ten iterations by default and independent evidence gates.
     AutoResearch,
+
+    /// Inspect an issue proposal and post a review report.
+    IssueReview,
+
+    /// Review a PR diff, conditionally reproduce behavior, and post a concise report.
+    PrReview,
 }
 
 #[derive(Debug, Args)]
 struct DeliveryArgs {
-    /// Materialize this template-owned delivery mode.
+    /// Template delivery mode. Defaults to pull_request for software-change, comment for issue-review and pr-review, otherwise none.
     #[arg(long, value_name = "MODE", conflicts_with_all = ["push", "pr", "ship"])]
     delivery: Option<String>,
 
@@ -465,7 +498,7 @@ struct TemplateShowArgs {
 
     The run-level harness and provider are the default lane. An agent binding may add
     "lane": {"harness": "claude", "provider": "anthropic"} to run that node on another accepted
-    pair; git_delivery bindings cannot. --uniform-runtime-config applies one lane to every agent
+    pair; git_delivery and comment_delivery bindings cannot. --uniform-runtime-config applies one lane to every agent
     node. Named targets must advertise per-node lane support (openengine.node-runtime-lanes/v1), and
     a local run first checks that each lane's executable (codex, claude, or copilot) is on PATH.
 
@@ -473,14 +506,15 @@ struct TemplateShowArgs {
     template-owned delivery binding.
 
     --uniform-runtime-config requires harness, provider, and model. It accepts optional size,
-    effort, sessionScope, and connections fields without nodes. Zeroshot expands that agent binding
+    effort, sessionScope, connections, activeMemory, and globalAgents fields without nodes.
+    Zeroshot expands that agent binding
     across every executable graph node and supplies graph-visible Git delivery bindings itself.
     Omitted connections reuse native local login for codex/openai, claude/anthropic,
     copilot/github, pi/anthropic, and pi/openai; other local lanes and contained targets derive
     their canonical connection requirements.
 
 ENVIRONMENT PREPARATION
-    For Docker or Cloud targets, pass --environment environment.json with a separate, flat JSON
+    For Docker or Platform targets, pass --environment environment.json with a separate, flat JSON
     definition (not a profile field or an "environment" wrapper):
 
       {
@@ -521,8 +555,17 @@ struct RunArgs {
     template: Option<TemplateName>,
 
     /// Load the graph's initial input from this JSON file.
-    #[arg(long, value_name = "FILE")]
-    input: PathBuf,
+    #[arg(
+        long,
+        value_name = "FILE",
+        required_unless_present = "task_from",
+        conflicts_with = "task_from"
+    )]
+    input: Option<PathBuf>,
+
+    /// Resolve a GitHub issue or pull-request URL into review input before starting.
+    #[arg(long, value_name = "URL", required_unless_present = "input")]
+    task_from: Option<String>,
 
     /// Load an exact secret-free runtime plan from this JSON file.
     #[arg(long, value_name = "FILE")]

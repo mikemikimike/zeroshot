@@ -45,6 +45,7 @@ impl SessionFactory for DeliveryLoopLane {
                 SessionFactory::open(self.delivery.as_ref(), invocation, environment).await
             }
             NodeRuntimeBinding::Agent { .. } => Ok(Arc::new(RepairSession)),
+            NodeRuntimeBinding::CommentDelivery { .. } => Err(NodeRunnerError::InvalidRole),
         }
     }
 }
@@ -347,6 +348,8 @@ async fn admitted_routing_graph(base_revision: &str) -> crate::native_v2_contrac
             graph,
             initial_input: routing_initial_input(base_revision),
             runtime: RuntimePlan::Codex {
+                active_memory: Default::default(),
+                global_agents: Default::default(),
                 provider: crate::native_v2_contract::CodexProvider::OpenAi,
                 size: RunSize::Medium,
                 nodes: BTreeMap::from([

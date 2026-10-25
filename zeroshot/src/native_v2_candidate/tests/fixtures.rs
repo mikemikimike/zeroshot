@@ -87,16 +87,22 @@ pub(super) fn runtime(kind: RuntimePlanKind) -> RuntimePlan {
         | RuntimePlanKind::ClaudeOverride
         | RuntimePlanKind::ClaudeReviewer
         | RuntimePlanKind::CopilotReviewer => RuntimePlan::Codex {
+            active_memory: Default::default(),
+            global_agents: Default::default(),
             provider: CodexProvider::OpenAi,
             size: RunSize::Medium,
             nodes,
         },
         RuntimePlanKind::Claude => RuntimePlan::Claude {
+            active_memory: Default::default(),
+            global_agents: Default::default(),
             provider: ClaudeProvider::Anthropic,
             size: RunSize::Medium,
             nodes,
         },
         RuntimePlanKind::Pi => RuntimePlan::Pi {
+            active_memory: Default::default(),
+            global_agents: Default::default(),
             provider: crate::native_v2_contract::PiProvider::Anthropic,
             size: RunSize::Medium,
             nodes,
@@ -221,6 +227,8 @@ pub(super) fn candidate_config(
     github: Arc<ScriptedGitHub>,
 ) -> NativeV2CandidateConfig {
     NativeV2CandidateConfig {
+        active_memory: None,
+        comment_delivery: None,
         lanes: runtime(kind)
             .lanes()
             .into_iter()
@@ -304,7 +312,7 @@ pub(super) fn harness_config(
 }
 
 pub(super) async fn wait_for_terminal(
-    controller: &NativeV2CloudController,
+    controller: &NativeV2PlatformController,
     run_id: &RunId,
 ) -> TerminalResult {
     tokio::time::timeout(Duration::from_secs(5), async {

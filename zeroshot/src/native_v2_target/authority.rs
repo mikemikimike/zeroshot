@@ -24,11 +24,48 @@ use zeroshot_engine::native_v2_cli::{
 
 use super::{TargetAuthorityError, TargetOecpAccess, TargetRecord};
 
-/// The external contract which hosting must implement before the native-v2 CLI can reach cloud.
+/// The external contract which hosting must implement before the native-v2 CLI can reach Platform.
 #[async_trait]
 pub trait TargetControlAuthority: Send + Sync {
+    fn redact_error(&self, error: TargetAuthorityError) -> TargetAuthorityError {
+        error
+    }
+
+    async fn review_cache_namespace(
+        &self,
+        _target: &TargetRecord,
+    ) -> Result<Option<String>, TargetAuthorityError> {
+        Ok(None)
+    }
+
+    async fn resolve_review(
+        &self,
+        _target: &TargetRecord,
+        _request: zeroshot_engine::native_v2_review::ReviewResolutionRequest,
+        _runtime: &openengine_cluster_protocol::RuntimePlan,
+    ) -> Result<zeroshot_engine::native_v2_review::PreparedReview, TargetAuthorityError> {
+        Err(TargetAuthorityError::new(
+            "target does not advertise task resolution",
+        ))
+    }
+
     async fn discover(&self, target: &TargetRecord) -> Result<(), TargetAuthorityError>;
     async fn login(&self, target: &TargetRecord) -> Result<(), TargetAuthorityError>;
+    async fn default_resource_scope(
+        &self,
+        _target: &TargetRecord,
+    ) -> Result<openengine_cluster_protocol::ConnectionScope, TargetAuthorityError> {
+        Ok(openengine_cluster_protocol::ConnectionScope::User)
+    }
+    async fn delegation(
+        &self,
+        _target: &TargetRecord,
+        _action: zeroshot_engine::native_v2_cli::DelegationAction,
+    ) -> Result<zeroshot_engine::native_v2_cli::DelegationResult, TargetAuthorityError> {
+        Err(TargetAuthorityError::new(
+            "target does not advertise delegation management",
+        ))
+    }
     async fn submit(
         &self,
         target: &TargetRecord,

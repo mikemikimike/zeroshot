@@ -77,7 +77,10 @@ pub struct CopilotAdapter {
     runners: ProviderProcessRunners,
     local_token: Option<String>,
     local_provider: Option<provider::LocalProviderContext>,
+    active_memory: Option<std::sync::Arc<crate::active_memory::hooks::ActiveMemoryHooks>>,
 }
+
+crate::active_memory::hooks::impl_active_memory_adapter!(CopilotAdapter);
 
 impl CopilotAdapter {
     #[must_use]
@@ -92,6 +95,7 @@ impl CopilotAdapter {
             runners,
             local_token: None,
             local_provider: None,
+            active_memory: None,
         }
     }
 
@@ -110,6 +114,7 @@ impl CopilotAdapter {
             runners: ProviderProcessRunners::local(),
             local_token,
             local_provider,
+            active_memory: None,
         }
     }
 
@@ -175,7 +180,8 @@ impl CopilotAdapter {
                         provider: local_provider.as_ref(),
                         redactions: redactions.clone(),
                     },
-                );
+                )
+                .with_active_memory(self.active_memory.clone(), files.workspace.clone());
                 let outcome = exchange_rpc(
                     &mut connection,
                     &process,

@@ -130,6 +130,8 @@ pub struct PortableControllerBootstrap {
     pub workspace: PathBuf,
     pub workspace_lease: PathBuf,
     pub checkpoint_repository: PathBuf,
+    /// Host-owned shared memory; omitted by embedders that have not configured a namespace.
+    pub memory_storage: Option<PathBuf>,
     pub storage: PathBuf,
     pub delivery_policy: DeliveryPolicy,
 }
@@ -201,7 +203,7 @@ pub enum PortableControllerError {
     #[error(transparent)]
     Ledger(#[from] crate::v2_run_ledger::RunLedgerError),
     #[error(transparent)]
-    Controller(#[from] crate::native_v2_cloud::NativeV2CloudError),
+    Controller(#[from] crate::native_v2_platform::NativeV2PlatformError),
     #[error("portable controller I/O failed")]
     Io(#[source] io::Error),
 }

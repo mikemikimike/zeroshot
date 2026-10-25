@@ -9,7 +9,7 @@ use openengine_cluster_protocol::{CheckpointId, NodeName, RunCheckpointsParams, 
 use crate::full_v1_reducer::ExecutionBoundary;
 use crate::execution::process::HostedProcessPool;
 use crate::native_v2_capsule::CapsuleFilesystem;
-use crate::native_v2_cloud::{
+use crate::native_v2_platform::{
     AllocatedCapsule, CapsuleAllocationUnavailable, RetainedAllocationRequest,
     RetainedAllocationUnavailable,
 };
@@ -72,9 +72,8 @@ exec /usr/bin/git "$@"
         config.git_program = program;
         config.workspace_storage = storage;
         let (output, diagnostic_receiver) = OperatorDiagnosticOutput::channel();
-        config.operator_diagnostics = Arc::new(OperatorDiagnosticStore::new(Some(output)));
-        let diagnostics = config.operator_diagnostics.clone();
-        let allocator = ProductionCapsuleAllocator::new(config)
+        let diagnostics = Arc::new(OperatorDiagnosticStore::new(Some(output)));
+        let allocator = ProductionCapsuleAllocator::new(Arc::new(config), diagnostics.clone())
             .assert_value()
             .with_test_filesystem_and_source(repository.remote.clone(), portable_filesystem);
         let admitted = admit(submission(
@@ -140,8 +139,10 @@ exec /usr/bin/git "$@"
             run_id,
             admitted: &self.admitted,
             github_token: Some(CHECKOUT_TOKEN),
-            preparation: crate::native_v2_cloud::CapsulePreparation::quiet(&self.admitted.runtime)
-                .assert_value(),
+            preparation: crate::native_v2_platform::CapsulePreparation::quiet(
+                &self.admitted.runtime,
+            )
+            .assert_value(),
         }
     }
 
@@ -716,7 +717,7 @@ async fn checkpoint_restore_survives_workspace_move_and_discard_removes_lineage_
             selection: CheckpointRestoreSelection::Checkpoint {
                 checkpoint_id: checkpoint_id.clone(),
             },
-            preparation: crate::native_v2_cloud::CapsulePreparation::quiet(
+            preparation: crate::native_v2_platform::CapsulePreparation::quiet(
                 &fixture.admitted.runtime,
             )
             .assert_value(),

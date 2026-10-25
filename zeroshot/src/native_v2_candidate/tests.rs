@@ -34,10 +34,10 @@ use crate::native_v2_cli::{
     NativeV2CliCommand, NativeV2CliError, NeverDetach, RunCommand, RunGraph, TargetAdd,
     PreparedRunRequest,
 };
-use crate::native_v2_cloud::{
+use crate::native_v2_platform::{
     AllocatedCapsule, CapsuleAllocationUnavailable, CapsuleAllocator, CapsuleCleanup,
     CapsuleCleanupUnavailable, CapsuleDestroyed, ControllerClaimUnavailable,
-    ExclusiveControllerClaim, NativeV2CloudController,
+    ExclusiveControllerClaim, NativeV2PlatformController,
 };
 use crate::native_v2_contract::{
     ClaudeProvider, CodexProvider, DeclaredConnections, DeclaredEnvironment,
@@ -326,7 +326,7 @@ impl NodeDriver for ScriptedAgent {
                 diagnostic: Value::Null,
                 artifacts: Vec::new(),
             }),
-            NodeRole::GitDelivery => Err(NodeRunnerError::InvalidRole),
+            NodeRole::GitDelivery | NodeRole::CommentDelivery => Err(NodeRunnerError::InvalidRole),
         }
     }
 }
@@ -385,9 +385,9 @@ impl CapsuleAllocator for CandidateAllocator {
 
     async fn allocate(
         &self,
-        request: crate::native_v2_cloud::CapsuleAllocationRequest<'_>,
+        request: crate::native_v2_platform::CapsuleAllocationRequest<'_>,
     ) -> Result<AllocatedCapsule, CapsuleAllocationUnavailable> {
-        let crate::native_v2_cloud::CapsuleAllocationRequest {
+        let crate::native_v2_platform::CapsuleAllocationRequest {
             run_id: _run_id,
             admitted,
             github_token: _github_token,
@@ -418,7 +418,10 @@ impl CapsuleAllocator for CandidateAllocator {
         let local = assemble_runner(
             admitted,
             agents,
-            Some(delivery),
+            CandidateDeliveries {
+                git: Some(delivery),
+                comment: None,
+            },
             CandidatePlacement::Capsule,
         )
         .map_err(|_| CapsuleAllocationUnavailable::Runtime)?;
@@ -443,7 +446,7 @@ impl CapsuleAllocator for CandidateAllocator {
 }
 
 #[tokio::test]
-async fn cloud_oecp_candidate_runs_worker_and_trusted_merge_entirely_through_v2() {
+async fn platform_oecp_candidate_runs_worker_and_trusted_merge_entirely_through_v2() {
     let repository = TempRepository::candidate();
     let target = DeliveryTarget::new("acme/project", "main", repository.base.clone())
         .assert_value_with("delivery target");
@@ -461,7 +464,7 @@ async fn cloud_oecp_candidate_runs_worker_and_trusted_merge_entirely_through_v2(
     });
     let ledger = Arc::new(FakeRunLedger::new());
     let controller = Arc::new(
-        NativeV2CloudController::new(ledger, allocator)
+        NativeV2PlatformController::new(ledger, allocator)
             .await
             .assert_value_with("controller"),
     );
@@ -514,7 +517,7 @@ async fn cloud_oecp_candidate_runs_worker_and_trusted_merge_entirely_through_v2(
 }
 
 #[tokio::test]
-async fn cloud_oecp_candidate_runs_each_agent_node_on_its_own_lane_and_provider_access() {
+async fn platform_oecp_candidate_runs_each_agent_node_on_its_own_lane_and_provider_access() {
     let repository = TempRepository::candidate();
     let target = DeliveryTarget::new("acme/project", "main", repository.base.clone())
         .assert_value_with("delivery target");
@@ -532,7 +535,7 @@ async fn cloud_oecp_candidate_runs_each_agent_node_on_its_own_lane_and_provider_
         cleanup: cleanup.clone(),
     });
     let controller = Arc::new(
-        NativeV2CloudController::new(Arc::new(FakeRunLedger::new()), allocator)
+        NativeV2PlatformController::new(Arc::new(FakeRunLedger::new()), allocator)
             .await
             .assert_value_with("controller"),
     );
@@ -595,7 +598,10 @@ async fn node_instance_session_reused_through_a_loop_stays_on_its_lane() {
             (CODEX_OPENAI, CandidateAgents::new(codex.clone())),
             (CLAUDE_ANTHROPIC, CandidateAgents::new(claude.clone())),
         ]),
-        Some(routing_delivery(root.path())),
+        CandidateDeliveries {
+            git: Some(routing_delivery(root.path())),
+            comment: None,
+        },
         CandidatePlacement::Local(SessionBoundary::Run),
     )
     .assert_value_with("candidate runner");
@@ -647,7 +653,7 @@ fn available_environment(values: &[(&str, &str)]) -> BTreeMap<EnvironmentVariabl
 
 async fn submit_through_cli(
     repository: &TempRepository,
-    controller: Arc<NativeV2CloudController>,
+    controller: Arc<NativeV2PlatformController>,
     kind: RuntimePlanKind,
     environment: BTreeMap<EnvironmentVariableName, String>,
 ) -> RunSubmitResult {
@@ -680,13 +686,13 @@ async fn submit_through_cli(
             source_connection: None,
 
             environment: None,
-            target: Some("candidate-cloud".to_owned()),
+            target: Some("candidate-platform".to_owned()),
             title: RunTitle::new("Candidate end to end").assert_value_with("title"),
             selection: crate::native_v2_cli::RunSelection::Inline {
                 graph: RunGraph::File(graph_path),
                 runtime: crate::native_v2_cli::RunRuntime::Exact(runtime_path),
             },
-            input: input_path,
+            input: input_path.into(),
             repository: Some(crate::native_v2_cli::RunRepository::GitHub(
                 SourceRepositoryId::new("acme/project").assert_value(),
             )),
@@ -949,7 +955,7 @@ async fn candidate_keys_each_built_adapter_by_the_lane_its_configuration_serves(
         ] {
             let mut lanes = candidate_config(kind, &repository, github.clone()).lanes;
             lanes.reverse();
-            let agents = lane_agents(lanes, placement).assert_value_with("lane adapters");
+            let agents = lane_agents(lanes, placement, None).assert_value_with("lane adapters");
             assert_eq!(
                 agents.keys().copied().collect::<BTreeSet<_>>(),
                 runtime(kind).lanes()
@@ -1004,6 +1010,7 @@ fn candidate_node_lane_routes_each_agent_binding_only_to_its_own_lane() {
     let codex_agent = Arc::as_ptr(&codex).cast::<()>();
     let claude_agent = Arc::as_ptr(&claude).cast::<()>();
     let routes = CandidateNodeLane {
+        comment_delivery: None,
         default_lane: CODEX_OPENAI,
         agents: BTreeMap::from([
             (CODEX_OPENAI, CandidateAgents::new(codex)),
@@ -1037,6 +1044,7 @@ fn candidate_node_lane_routes_each_agent_binding_only_to_its_own_lane() {
     );
 
     let claude_only = CandidateNodeLane {
+        comment_delivery: None,
         default_lane: CODEX_OPENAI,
         agents: BTreeMap::from([(CLAUDE_ANTHROPIC, CandidateAgents::new(claude))]),
         delivery: Some(routing_delivery(&workspace)),

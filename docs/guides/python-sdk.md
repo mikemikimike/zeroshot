@@ -1,3 +1,7 @@
+---
+description: "Use the typed asynchronous zeroshot Python SDK with local, direct and hosted targets. Install a platform wheel and submit a run."
+---
+
 # Python SDK
 
 `the-open-engine-zeroshot` is a typed asynchronous client for local, direct, and named hosted
@@ -42,7 +46,10 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Opening a client captures the current folder; the default preset is `Preset("software-change", delivery="none")`.
+Opening a client captures the current folder; the default preset is `Preset("software-change")`.
+An omitted delivery selector uses the native template default: a PR for `software-change`, a comment
+for `pr-review` and `issue-review`. PR publication requires a Git checkout, GitHub access, and the declared `github.GH_TOKEN`
+connection. Use `Preset("software-change", delivery="none")` for local changes without publication.
 Per-run `cwd=` paths resolve from that captured folder, or `LocalTarget.workspace` when supplied.
 Local graphs without Git delivery accept plain folders. Push needs committed Git and a remote;
 PR and merge need a supported forge (GitHub today). Choose the harness, provider, and model.
@@ -116,7 +123,7 @@ async def submit_release_plan() -> None:
         submission_key="checkout-release-1",
     )
 
-    async with Client(target=HostedTarget("cloud")) as client:
+    async with Client(target=HostedTarget("platform")) as client:
         plan = await client.submit_plan(request)
         status = await plan.wait(wait_timeout=21_600)
 
@@ -125,7 +132,7 @@ async def submit_release_plan() -> None:
 ```
 
 Submission is atomic, and every node receives a stable run ID. `needs` gates readiness only; plan
-nodes have no output interpolation or shared mutable input. After dependencies merge, Cloud
+nodes have no output interpolation or shared mutable input. After dependencies merge, Platform
 materializes the node against an exact source revision. When materialization completes, `readyAt`
 is set and the node's queue deadline is the earlier of plan expiry and seven days after `readyAt`.
 A merge conflict is repaired by the conflicting run itself in the same checkout and delivery loop.

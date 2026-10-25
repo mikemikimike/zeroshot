@@ -23,6 +23,7 @@ use crate::{
 
 pub const TARGET_DISCOVERY_PATH: &str = "/.well-known/zeroshot-native-v2";
 pub const TARGET_RUN_PATH: &str = "/native-v2/run";
+pub const TARGET_TASK_RESOLUTION_PATH: &str = "/native-v2/tasks/resolve";
 pub const TARGET_SESSION_PATH: &str = "/native-v2/oecp-session";
 pub const TARGET_OECP_PATH: &str = "/native-v2/oecp";
 pub const TARGET_PRIVATE_BOOTSTRAP_PATH: &str = "/native-v2/private-bootstrap";
@@ -474,9 +475,28 @@ pub struct TargetGitTransportDiscovery {
     pub kind: String,
 }
 
+pub const COMMENT_DELIVERY_KIND: &str = "openengine.comment-delivery/v1";
+pub const TASK_RESOLUTION_KIND: &str = "openengine.task-resolution/v1";
+
+/// Frozen marker; routes and future capability details belong in separate extensions.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TargetCommentDeliveryDiscovery {
+    pub kind: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TargetTaskResolutionDiscovery {
+    pub kind: String,
+    pub resolve: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, rename_all = "snake_case")]
 pub struct TargetDiscoveryExtensions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<crate::TargetApiKeyDiscovery>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hosted_runs: Option<TargetHostedRunsDiscovery>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -497,6 +517,10 @@ pub struct TargetDiscoveryExtensions {
     pub node_runtime_lanes: Option<TargetNodeRuntimeLanesDiscovery>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_transport: Option<TargetGitTransportDiscovery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_delivery: Option<TargetCommentDeliveryDiscovery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_resolution: Option<TargetTaskResolutionDiscovery>,
 }
 
 /// One discovery document for direct Docker targets and OAuth-hosted targets.
@@ -522,20 +546,44 @@ pub struct TargetDiscoveryDocument {
 impl TargetDiscoveryExtensions {
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.hosted_runs.is_none()
+        self.api_key.is_none()
+            && self.hosted_runs.is_none()
             && self.run_history.is_none()
             && self.merge_plans.is_none()
             && self.connections.is_none()
             && self.run_profiles.is_none()
-            && self.workspace_recovery.is_none()
+            && self.controller_extensions_empty()
+    }
+
+    const fn controller_extensions_empty(&self) -> bool {
+        self.workspace_recovery.is_none()
             && self.workspace_checkpoints.is_none()
             && self.hosted_workspace_recovery.is_none()
             && self.node_runtime_lanes.is_none()
             && self.git_transport.is_none()
+            && self.comment_delivery.is_none()
+            && self.task_resolution.is_none()
     }
 }
 
 impl TargetDiscoveryDocument {
+    #[must_use]
+    pub fn with_comment_delivery(mut self) -> Self {
+        self.extensions.comment_delivery = Some(TargetCommentDeliveryDiscovery {
+            kind: COMMENT_DELIVERY_KIND.to_owned(),
+        });
+        self
+    }
+
+    #[must_use]
+    pub fn with_task_resolution(mut self) -> Self {
+        self.extensions.task_resolution = Some(TargetTaskResolutionDiscovery {
+            kind: TASK_RESOLUTION_KIND.to_owned(),
+            resolve: TARGET_TASK_RESOLUTION_PATH.to_owned(),
+        });
+        self
+    }
+
     #[must_use]
     pub fn direct(authentication: TargetAuthentication) -> Self {
         Self {

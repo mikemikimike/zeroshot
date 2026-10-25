@@ -61,13 +61,13 @@ class Preset:
 
     Args:
         name: Exact name returned by Client.list_presets().
-        delivery: Native delivery selector: none, push, pull_request, or merge.
+        delivery: Native delivery selector. None uses the executable-owned template default.
         pull_request_feedback: Whether pull-request feedback is considered or ignored for
             pull_request and merge delivery.
     """
 
     name: str
-    delivery: str = field(default="none", kw_only=True)
+    delivery: str | None = field(default=None, kw_only=True)
     pull_request_feedback: str = field(default="consider", kw_only=True)
 
 
@@ -115,6 +115,8 @@ class UniformRuntime:
         connections: Connection keys mapped to the exact environment field names their agent nodes
             need. None selects the executable-owned provider defaults; an empty mapping declares no
             connections.
+        active_memory: Optional native repository/graph recall and collection controls.
+        global_agents: Optional native built-in global-agent settings, including postmortem.
     """
 
     harness: str
@@ -124,6 +126,8 @@ class UniformRuntime:
     size: str = "medium"
     session_scope: str = "execution"
     connections: Mapping[str, tuple[str, ...]] | None = None
+    active_memory: Mapping[str, JsonValue] | None = None
+    global_agents: Mapping[str, JsonValue] | None = None
 
     def to_dict(self) -> dict[str, JsonValue]:
         """Encode the declarative uniform runtime consumed and validated by Zeroshot."""
@@ -140,6 +144,10 @@ class UniformRuntime:
             value["connections"] = {
                 key: list(environment) for key, environment in self.connections.items()
             }
+        if self.active_memory is not None:
+            value["activeMemory"] = deepcopy(dict(self.active_memory))
+        if self.global_agents is not None:
+            value["globalAgents"] = deepcopy(dict(self.global_agents))
         return value
 
 

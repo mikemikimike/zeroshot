@@ -1,6 +1,10 @@
+---
+description: "Install the zeroshot CLI and its agent skills, connect Cloud, open the workspace UI and prepare a local run."
+---
+
 # Install Zeroshot
 
-Install the `zeroshot` command and its agent skill through the npm delivery package, which requires
+Install the `zeroshot` command and its agent skills through the npm delivery package, which requires
 Node.js 18 or newer. The installer selects the release target declared for the current system and
 checks the downloaded archive against `SHA256SUMS` before writing the native executable.
 
@@ -8,8 +12,8 @@ checks the downloaded archive against `SHA256SUMS` before writing the native exe
 npm install --global @the-open-engine-company/zeroshot
 ```
 
-A canonical CLI release can update its executable and managed agent skill in place. The command
-selects the newest GitHub release for the current platform, verifies its archive and skill asset
+A canonical CLI release can update its executable and managed agent skills in place. The command
+selects the newest GitHub release for the current platform, verifies its archive and skill assets
 against that release's `SHA256SUMS`, and verifies the new executable before replacing the old one:
 
 ```console
@@ -21,14 +25,22 @@ Unchanged managed skill copies are installed or refreshed for Codex, GitHub Copi
 Code. A user-edited or conflicting skill is preserved, and the command fails with its exact path
 after completing any safe updates.
 
+An older updater that only installs the `zeroshot` skill needs a second `zeroshot update` after
+replacing the executable to install `zeroshot-memory-init`. The new updater refreshes skills even
+when the executable version is already current.
+
 Release builds cover Linux x64 and arm64, macOS x64 and arm64, and Windows x64. Node.js is only an
 installer dependency; the command itself is a Rust executable.
 
-The package installs one managed skill for Codex, GitHub Copilot, and Pi under `$HOME/.agents/skills`,
-and for Claude Code under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills`. No agent selection or
+The package installs the `zeroshot` and `zeroshot-memory-init` skills for Codex, GitHub Copilot, and
+Pi under `$HOME/.agents/skills/<name>`, and for Claude Code under
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>`. No agent selection or
 per-project installation is needed. npm 7 and newer do not run uninstall hooks; after removing the
-package, delete its two skill directories manually only if their `SKILL.md` files remain unmodified.
-When set, `CLAUDE_CONFIG_DIR` must be absolute so the global skill has one stable location.
+package, remove only unmodified managed skill directories from these locations.
+When set, `CLAUDE_CONFIG_DIR` must be absolute so the global skills have stable locations.
+
+See [Active Memory storage and backups](../guides/active-memory.md#persistence-and-run-completion)
+for the local lesson database and how to preserve it when moving or reinstalling Zeroshot.
 
 On Windows, the CLI and local in-process runs work natively from PowerShell or Command Prompt.
 Install Git for Windows and put Git and your chosen harness on `PATH`; npm-installed `.cmd`
@@ -40,16 +52,16 @@ For Codex, complete its [native Windows sandbox setup](https://developers.openai
 if your Codex permission settings require it. Workers and reviewers use the same permission handling;
 Zeroshot does not install the sandbox.
 
-## Connect Zeroshot Cloud
+## Connect Zeroshot Platform
 
-The Cloud target is built in. Sign in once; organization selection happens in the browser:
+The Platform target is built in. Sign in once; organization selection happens in the browser:
 
 ```console
-zeroshot target login cloud
+zeroshot target login platform
 ```
 
-Cloud runs use `--target cloud`. Omit `--target` for local execution. The
-[Zeroshot Cloud docs](https://cloud.zeroshot.sh/docs) cover organizations, the GitHub App, and saved
+Platform runs use `--target platform`. Omit `--target` for local execution. The
+[Zeroshot Platform docs](https://cloud.zeroshot.sh/docs) cover organizations, the GitHub App, and saved
 connections.
 
 ## Open the workspace UI
@@ -68,7 +80,7 @@ To inspect runs on a configured target while keeping profiles in the local CLI s
 zeroshot ui --target docker
 ```
 
-Use `--target cloud` after signing in to inspect Cloud runs through the same local UI.
+Use `--target platform` after signing in to inspect Platform runs through the same local UI.
 
 **Profiles** edits graphs and runtime settings; the info icon explains authoring defaults.
 Saved profiles share the CLI's configuration store (`ZEROSHOT_CONFIG_DIR`); without `--target`,
@@ -80,7 +92,7 @@ zeroshot run --title "My task" --profile local:my-profile --input input.json
 
 Open **Runs** for [live monitoring and replay](../guides/observe-and-control.md#browser).
 The [Docker target](../concepts/targets.md#direct-target) serves its own profiles and runs at `/ui/`.
-Cloud embedding remains tracked in [zero-cloud #301](https://github.com/the-open-engine/zero-cloud/issues/301).
+Platform embedding remains tracked in [zero-cloud #301](https://github.com/the-open-engine/zero-cloud/issues/301).
 
 Release executables embed the UI. To build it from source:
 
@@ -125,8 +137,8 @@ lists the automatic requirements and explains the separation.
 ## Other installation paths
 
 Each [GitHub release](https://github.com/the-open-engine/zeroshot/releases) includes native archives,
-the canonical `zeroshot-skill.md`, and `SHA256SUMS`; archive names contain the release version and
-target triple.
+the canonical `zeroshot-skill.md` and `zeroshot-memory-init-skill.md`, and `SHA256SUMS`; archive
+names contain the release version and target triple.
 
 The Python SDK requires Python 3.11 or newer and ships the matching executable inside each platform
 wheel. Download the wheel for your [OS and CPU](../guides/python-sdk.md#install-and-run) from [Python SDK releases](https://github.com/the-open-engine/zeroshot/releases?q=zeroshot-python-v).
