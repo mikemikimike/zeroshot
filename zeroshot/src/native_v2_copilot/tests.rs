@@ -880,12 +880,70 @@ async fn grammar_compilation_rate_limit_retry_exhaustion_preserves_provider_erro
 }
 
 #[tokio::test]
+async fn grammar_compilation_rate_limit_drain_failure_is_terminal() {
+    let fixture = Fixture::new("grammar_rate_limit_drain_error").await;
+    let (events, outcome) = complete(fixture.start(1).await).await;
+    let Err(NodeRunnerError::DriverDetail(error)) = outcome else {
+        panic!("expected the drain failure to be terminal: {outcome:?}");
+    };
+    assert!(
+        error.contains("Copilot token usage is invalid or out of range"),
+        "{error}"
+    );
+    assert!(error_output(&events).is_empty());
+    assert_eq!(
+        fixture
+            .capture()
+            .iter()
+            .filter(|message| message["method"] == "session.send")
+            .count(),
+        1,
+        "a drain failure must not be retried as a grammar rate limit"
+    );
+}
+
+#[tokio::test]
+async fn grammar_compilation_rate_limit_cancellation_during_backoff_does_not_resend() {
+    let fixture = Fixture::new("grammar_rate_limit_always").await;
+    let mut handle = fixture.start(1).await;
+    let mut output = handle.take_initial_output().assert_value();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), output.recv_output())
+            .await
+            .assert_value()
+            .assert_value();
+        if event.stream == LiveOutputStream::System
+            && event
+                .text
+                .contains("Copilot grammar compilation rate limited; retrying")
+        {
+            break;
+        }
+    }
+    handle.cancel();
+    let completion = tokio::time::timeout(Duration::from_secs(10), handle.completion())
+        .await
+        .assert_value();
+    assert_eq!(completion, Err(NodeRunnerError::Cancelled));
+    assert_eq!(
+        fixture
+            .capture()
+            .iter()
+            .filter(|message| message["method"] == "session.send")
+            .count(),
+        1,
+        "cancelling during backoff must not start another session.send"
+    );
+}
+
+#[tokio::test]
 async fn fails_closed_on_protocol_identity_and_provider_errors() {
     for (mode, detail) in [
         ("version", "is incompatible; install CLI 1.0.86"),
         ("identity", "Copilot returned a different session"),
         ("error", "rejected [REDACTED]"),
         ("http_400", "HTTP 400: Invalid JSON schema"),
+        ("http_400_stderr_grammar", "HTTP 400: Invalid JSON schema"),
     ] {
         let fixture = Fixture::new(mode).await;
         let (events, outcome) = complete(fixture.start(1).await).await;
@@ -901,7 +959,7 @@ async fn fails_closed_on_protocol_identity_and_provider_errors() {
             assert!(error.contains("stderr: launch note: [REDACTED]"));
         }
         assert!(!format!("{events:?} {error}").contains("gho_fake-secret"));
-        if mode == "http_400" {
+        if mode == "http_400" || mode == "http_400_stderr_grammar" {
             assert_eq!(
                 fixture
                     .capture()

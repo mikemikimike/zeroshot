@@ -63,6 +63,12 @@ while (message := read()) is not None:
     if method == "connect":
         if mode == "version":
             print("launch note: gho_fake-secret", file=sys.stderr, flush=True)
+        if mode == "http_400_stderr_grammar":
+            print(
+                "400 Grammar compilation rate limit exceeded (stale stderr)",
+                file=sys.stderr,
+                flush=True,
+            )
         result = {"protocolVersion": 99 if mode == "version" else 3}
     elif method in ("session.create", "session.resume"):
         assert "COPILOT_GITHUB_TOKEN" not in os.environ
@@ -188,6 +194,7 @@ while (message := read()) is not None:
             "grammar_rate_limit_once",
             "grammar_rate_limit_always",
             "correction_rate_limit_once",
+            "grammar_rate_limit_drain_error",
         ):
             attempts_path = os.environ["CAPTURE_PATH"] + ".grammar-rate-limit-attempts"
             try:
@@ -202,13 +209,18 @@ while (message := read()) is not None:
                 mode == "grammar_rate_limit_always"
                 or (mode == "grammar_rate_limit_once" and attempts == 0)
                 or (mode == "correction_rate_limit_once" and attempts == 1)
+                or (mode == "grammar_rate_limit_drain_error" and attempts == 0)
             )
             if should_rate_limit:
                 event("session.error", {
                     "message": "400 Grammar compilation rate limit exceeded. You can try again later."
                 })
+                if mode == "grammar_rate_limit_drain_error":
+                    event("assistant.usage", {
+                        "inputTokens": "invalid", "outputTokens": 1
+                    })
                 continue
-        if mode == "http_400":
+        if mode in ("http_400", "http_400_stderr_grammar"):
             event("session.error", {"message": "HTTP 400: Invalid JSON schema"})
             continue
         event("future.event", {"invalid": [1, 2, 3]})

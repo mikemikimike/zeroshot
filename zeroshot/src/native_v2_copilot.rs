@@ -192,15 +192,21 @@ impl CopilotAdapter {
                     },
                 )
                 .await;
-                finish_rpc(&mut connection, &mut process, control, outcome).await
+                Ok(finish_rpc(&mut connection, &mut process, control, outcome).await)
             }
             .await
-            .map_err(|error| redact_provider_error(error, &redactions));
+            .unwrap_or_else(|error| FinishedRpc {
+                outcome: Err(error),
+                retryable_grammar_rate_limit: false,
+            });
+            let retryable_grammar_rate_limit = result.retryable_grammar_rate_limit;
+            let result = result
+                .outcome
+                .map_err(|error| redact_provider_error(error, &redactions));
 
             match result {
-                Err(NodeRunnerError::DriverDetail(message))
-                    if rpc::is_grammar_compilation_rate_limit(&message)
-                        && retries < MAX_GRAMMAR_RATE_LIMIT_RETRIES =>
+                Err(NodeRunnerError::DriverDetail(_))
+                    if retryable_grammar_rate_limit && retries < MAX_GRAMMAR_RATE_LIMIT_RETRIES =>
                 {
                     let session_id = session.id.lock().await.clone().unwrap_or_default();
                     let delay = rpc::grammar_rate_limit_retry_delay(retries, &session_id);
@@ -218,9 +224,7 @@ impl CopilotAdapter {
                     rpc::wait_for_grammar_rate_limit_retry(control, delay).await?;
                     retries += 1;
                 }
-                Err(NodeRunnerError::DriverDetail(message))
-                    if rpc::is_grammar_compilation_rate_limit(&message) =>
-                {
+                Err(NodeRunnerError::DriverDetail(message)) if retryable_grammar_rate_limit => {
                     return Err(rpc::failure(format!(
                         "Copilot grammar compilation rate limit persisted after {retries} retries: {message}"
                     )));
@@ -262,24 +266,48 @@ impl CopilotAdapter {
     }
 }
 
+struct FinishedRpc {
+    outcome: Result<WorkerOutcome, NodeRunnerError>,
+    retryable_grammar_rate_limit: bool,
+}
+
 async fn finish_rpc(
     connection: &mut rpc::CopilotRpc<'_>,
     process: &mut ProviderProcess,
     control: &DriverControl,
     outcome: Result<WorkerOutcome, NodeRunnerError>,
-) -> Result<WorkerOutcome, NodeRunnerError> {
+) -> FinishedRpc {
     // Stop the owned tree while draining its remaining events, including token usage.
     // Releasing an intentionally completed headless server is not a provider cancellation.
     let (completion, drained) = tokio::join!(process.release(), connection.drain());
-    let outcome = outcome.and_then(|outcome| drained.map(|()| outcome));
+    let retryable_grammar_rate_limit = drained.is_ok()
+        && matches!(
+            &outcome,
+            Err(NodeRunnerError::DriverDetail(detail))
+                if rpc::is_grammar_compilation_rate_limit(detail)
+        );
+    let outcome = match drained {
+        Ok(()) => outcome,
+        Err(error) => Err(error),
+    };
     let completion = match require_process_cleanup(&completion) {
         Ok(completion) => completion,
-        Err(_) => return Err(rpc_cleanup_failure(&outcome, &connection.redactions, control).await),
+        Err(_) => {
+            return FinishedRpc {
+                outcome: Err(rpc_cleanup_failure(&outcome, &connection.redactions, control).await),
+                retryable_grammar_rate_limit: false,
+            };
+        }
     };
-    if control.is_cancelled() && outcome.is_ok() {
-        return Err(NodeRunnerError::Cancelled);
+    let outcome = if control.is_cancelled() && outcome.is_ok() {
+        Err(NodeRunnerError::Cancelled)
+    } else {
+        outcome.map_err(|error| connection.failure_diagnostic(error, completion))
+    };
+    FinishedRpc {
+        outcome,
+        retryable_grammar_rate_limit,
     }
-    outcome.map_err(|error| connection.failure_diagnostic(error, completion))
 }
 
 // Cleanup owns settlement, while the earlier provider explanation remains diagnostic evidence.
