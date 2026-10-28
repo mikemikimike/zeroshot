@@ -77,44 +77,50 @@ impl Drop for TemporaryDirectory {
     }
 }
 
-/// Absolute path to the Python 3 interpreter used by Unix executable fixtures.
-///
-/// Fixture scripts keep the portable `#!/usr/bin/env python3` shebang so the repository does not
-/// depend on one host layout, while `python3_script` binds execution to the interpreter that is
-/// actually installed on the machine running the test.
+/// Actual interpreter selected by Python 3 on the test process's PATH, including version managers.
 #[cfg(unix)]
 #[must_use]
 pub fn python3_interpreter() -> PathBuf {
-    let mut candidates = vec![
-        PathBuf::from("/usr/local/bin/python3"),
-        PathBuf::from("/usr/bin/python3"),
-        PathBuf::from("/bin/python3"),
-    ];
-    if let Some(search_path) = std::env::var_os("PATH") {
-        candidates
-            .extend(std::env::split_paths(&search_path).map(|directory| directory.join("python3")));
-    }
-    candidates
-        .into_iter()
-        .find(|candidate| {
-            candidate
-                .metadata()
-                .is_ok_and(|metadata| metadata.is_file())
-        })
-        .expect("a Python 3 interpreter is required by executable fixtures")
+    use std::os::unix::ffi::OsStringExt;
+
+    let output = std::process::Command::new("python3")
+        .args([
+            "-c",
+            "import os, sys; sys.stdout.buffer.write(os.fsencode(sys.executable))",
+        ])
+        .output()
+        .expect("run python3 on the test PATH");
+    assert!(
+        output.status.success(),
+        "Python interpreter discovery failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let interpreter = PathBuf::from(std::ffi::OsString::from_vec(output.stdout));
+    assert!(
+        interpreter.is_absolute(),
+        "python3 reported no absolute sys.executable: {interpreter:?}"
+    );
+    interpreter
 }
 
-/// Rewrites a portable Python fixture shebang to the interpreter installed on this host.
+/// Binds a portable Python fixture to its interpreter, independent of child PATH and HOME.
 #[cfg(unix)]
 #[must_use]
 pub fn python3_script(source: &str) -> String {
     const PORTABLE: &str = "#!/usr/bin/env python3";
     match source.strip_prefix(PORTABLE) {
-        Some(rest) => format!(
-            "#!{}\n{}",
-            python3_interpreter().display(),
-            rest.strip_prefix('\n').unwrap_or(rest)
-        ),
+        Some(rest) => {
+            let interpreter = python3_interpreter();
+            let interpreter = interpreter
+                .to_str()
+                .expect("UTF-8 Python path")
+                .replace('\'', "'\\''");
+            // The shell exec is a Python docstring; quoting preserves interpreter paths and argv.
+            format!(
+                "#!/bin/sh\n'''exec' '{interpreter}' \"$0\" \"$@\"\n' '''\n{}",
+                rest.strip_prefix('\n').unwrap_or(rest)
+            )
+        }
         None => source.to_owned(),
     }
 }
