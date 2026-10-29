@@ -54,6 +54,7 @@ nav:
       - Runtimes and connections: concepts/runtimes-and-connections.md
       - Targets: concepts/targets.md
   - Guides:
+      - Plan work before running it: guides/planning.md
       - Prepare a runtime environment: guides/runtime-environments.md
       - Active Memory: guides/active-memory.md
       - Build a review loop: guides/review-loop.md
@@ -82,7 +83,7 @@ nav:
       - Documentation versions: project/versioning.md
       - Distribution contract: zeroshot-distribution.md
       - Source-code adapters: project/source-code-adapters.md
-  - Zeroshot Platform: https://cloud.zeroshot.sh/docs
+  - Zeroshot Platform: https://app.zeroshot.sh/docs
   - zeroshot.sh: https://zeroshot.sh/?utm_source=github&utm_medium=docs&utm_campaign=zeroshot
 
 plugins:

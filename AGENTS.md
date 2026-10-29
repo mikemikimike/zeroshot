@@ -28,8 +28,9 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   profile UI. The UI is served by Rust and never needs a production Node server.
 - Canonical releases are explicit `vX.Y.Z` tags with major version 8 or newer.
 - The npm package is `@the-open-engine-company/zeroshot`.
-- That package owns the canonical `zeroshot` and `zeroshot-memory-init` skills and installs managed
-  copies for Codex, GitHub Copilot, Pi, and Claude Code at their user scopes. Do not fork skills by host.
+- That package owns the canonical `zeroshot`, `zeroshot-memory-init`, `zeroshot-graph-design`, and
+  `zeroshot-plan` skills and installs managed copies for Codex, GitHub Copilot, Pi, and Claude Code
+  at their user scopes. Do not fork skills by host.
 - The target image is `ghcr.io/the-open-engine/zeroshot-target`.
 - The Python distribution is `the-open-engine-zeroshot`; its import package remains `zeroshot`.
 - Python SDK tags are `zeroshot-python-vZEROSHOT_SDK` and package versions are
@@ -135,7 +136,10 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   durable replay. Final-round facts replace older facts when the loop returns to its parent.
 - Model identifiers are opaque provider-owned strings. Do not infer a harness from a provider/model,
   maintain runtime model catalogs, or validate provider availability. Admission may reject only known
-  incompatible harness/provider pairs.
+  incompatible harness/provider pairs. A caller may declare optional bounded `contextWindow` and
+  `maxTokens` on an agent binding; they are declarations rather than catalog knowledge, are written
+  only to the Pi gateway model entry when supplied, and stay absent so the provider keeps its own
+  defaults otherwise. Never infer either value from the model identifier.
 - Full-v1 loops may declare `maxIterationsInput` as an integer path in the initial input.
   Reusable profiles verify the authored default `maxIterations`; native-v2 run admission binds a
   present positive safe integer from caller input and re-verifies the concrete graph. An absent
@@ -220,11 +224,16 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   verifiers share the prepared workspace and can write files. Review instructions prohibit repairs
   and warn that other nodes may execute concurrently; this is an instructional boundary. Missing
   dependencies are reported with environment evidence rather than unrelated code repair requests.
+  Hosting embedders may attach an `AgentContextProvider` through `ProductionHostingConfig`.
+  The runner samples its nonsecret context for every agent execution, including node-instance
+  revisits and auxiliary agents, and all four harnesses prepend it through the shared invocation
+  prompt methods. Host context stays outside authored graphs, runtime plans, durable invocations,
+  and checkpoints. Default local/direct composition attaches no host context.
   Shared inspection owns bounded JSONL exchange and process cleanup. Each harness owns its native
   policy parser and `apply_permission_default` entry point; `PermissionPolicy` distinguishes unset,
   configured, and unavailable inspection results. Codex browser/computer access controls and explicit
   approval-review features count as authored policy.
-- The local target registry initializes `platform` at `https://api.cloud.zeroshot.sh` with a persistent hosted device identity.
+- The local target registry initializes `platform` at `https://api.app.zeroshot.sh` with a persistent hosted device identity.
 - Local runs select an optional `--cwd` workspace, defaulting to the invoking folder. File arguments
   stay relative to the invoking folder. A Git checkout uses its canonical root; plain, unborn, and
   detached folders are allowed when the graph has no Git delivery. Workspace and active Zeroshot
@@ -361,7 +370,8 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   name the wire protocol (`openai-responses`, `openai-completions`, or `anthropic-messages`) and
   reach any endpoint Pi implements without probing it. The registered model entry carries the
   caller's identifier, the chosen protocol, and a `reasoning` flag mirroring the binding's authored
-  effort; context window, output limit, and cost stay Pi-owned defaults. The same file is Pi's only
+  effort. It carries `contextWindow` and `maxTokens` only when the caller declared them, so omitted
+  limits and cost stay Pi-owned defaults. The same file is Pi's only
   caller-owned-endpoint mechanism, which is why it also backs a declared or ambient
   `ANTHROPIC_BASE_URL` on the `anthropic` lane and `OPENAI_BASE_URL`/`OPENAI_API_BASE` on the
   `openai` lane: those overrides retarget the endpoint and keep each built-in provider's own
@@ -389,7 +399,8 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   gateway lane must name its protocol through `GATEWAY_API`. Local validation remains authoritative
   and corrections stay bounded to two turns.
 - Copilot uses the pinned CLI's headless JSON-RPC protocol 3, with provider `github` and
-  caller-owned model IDs. Structured output and corrections share one session; node-instance
+  caller-owned model IDs. Remote session synchronization is disabled with `--sync-session off`.
+  Structured output and corrections share one session; node-instance
   revisits resume from the current user's `COPILOT_HOME` locally and a private home when contained.
   Local runs reuse stored Copilot login, host/auth endpoint settings, and supported custom-provider
   environment. Static custom-provider configuration and ambient or declared GitHub tokens cross
@@ -415,6 +426,10 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   expiring credentials use the runtime resolver callback, validate the configured GitHub host, and
   must retain more than one hour. Present but empty or malformed declared credentials fail closed
   instead of falling back to native login.
+  Grammar compilation rate limits retry at most three times with exponential backoff and
+  per-session staggering after confirmed cleanup and a successful event drain. Retries resume
+  the same session with its current correction prompt and host context; other provider errors
+  remain terminal.
   Copilot RPC bounds each message to 64 MiB and bounds pending requests and output queues.
   After an accepted answer, a valid `session.detach` refusal or peer EOF is logged and keeps the
   outcome, including a closed stdin pipe during that request. Malformed RPC replies/events, other
@@ -456,8 +471,11 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   and dispatch waves. The supervisor captures only after all live executions and cleanup have settled;
   read-only boundaries reuse bytes. Local/direct storage normalizes Git into a temporary private
   filesystem stage, commits it to one deduplicated Restic repository per recovery lineage, and then
-  removes the full stage. Small catalogs atomically map logical checkpoint IDs to Restic snapshots;
-  versioned execution seeds live in separate files and are read only for selected continuation.
+  removes the full stage. Small catalogs atomically map logical checkpoint IDs to Restic snapshots.
+  Restic drains progress and private stderr completely with bounded memory, retaining only the
+  latest summary under a per-record size bound. Errors identify the operation and failure stage
+  or exit status without private child output; failed backups never replace a published checkpoint.
+  Versioned execution seeds live in separate files and are read only for selected continuation.
   Restart restores the latest published snapshot without importing a seed. Restore staging is a
   private sibling of the workspace so final replacement stays on one filesystem. Successful
   lineages delete their catalogs and repository only after durable terminal success; failed lineages
@@ -554,7 +572,7 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   it before deleting the workspace or releasing its identity lease; failed cleanup retains both.
   Allocation retains cleanup authority before checkout starts, including through startup errors and
   cancellation. Controllers confirm destruction before recording an allocation failure as terminal.
-  Local Git retains the caller identity.
+  Local Git retains the caller's OS identity, separately from fixed delivery commit authorship.
 - Delivery clears the environment of its Git and GitHub CLI processes, so local composition pins
   delivery Git and, when the GitHub adapter is selected, `gh` to the files `find_executable` finds
   on the captured search path. Local `run`/`resume` reject a missing one as a usage error with the
@@ -583,6 +601,9 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
   resolution belongs to each supervised execution, so it observes the authored deadline and does
   not block parallel dispatch. Pending authorized head adoption survives repair.
 - Git diagnostics retain bounded, credential-redacted command/status/stdout/stderr details.
+  Capture and native transport share credential-name selection for tokens, passwords and API keys,
+  respecting operating-system case rules. Trusted Git commands pin author and committer identity
+  after applying native transport context and keep automatic GC foreground on old and current Git.
   Private Git protocol stdout stays separate from printable diagnostics; parsing and failure
   classification must preserve raw evidence before credential redaction. Final delivery feedback
   also redacts the invocation's source credentials and its current refreshed issuance;
@@ -982,6 +1003,8 @@ with `npm i -g @the-open-engine-company/zeroshot` or build `zeroshot` with Cargo
 - Unix tests that create executable fixtures use
   `openengine_cluster_testkit::fixture::write_executable`; its lock handoff covers writable
   descriptors inherited by concurrent process spawns.
+- Python test doubles use `openengine_cluster_testkit::fixture::python3_script`, which resolves
+  the test PATH's actual interpreter before entering a pinned or cleared child environment.
 - `.opcore.json` owns the full-source Opcore policy. `.github/workflows/opcore.yml` runs the Fast
   and native Rust providers on every PR and main commit. Its two exact PowerShell exclusions reflect
   unsupported parsing; the Windows native CI lane still runs those scripts.
@@ -1019,7 +1042,10 @@ python -m mkdocs build --strict
 ## Release convention
 
 - CI has native, Python, repository-tooling, npm-package, and strict-documentation lanes plus stable
-  aggregate `required`. Native changes also require macOS product and test compilation with the UI
+  aggregate `required`. On PRs, that aggregate waits for Greptile's latest review check on the exact
+  head to complete; findings remain review input for the worker rather than automatic CI failures.
+  Merge groups use the completed PR gate because Greptile does not review merge-group commits.
+  Native changes also require macOS product and test compilation with the UI
   feature, focused Unix controller socket regression tests, and APFS workspace clone tests that
   `ZEROSHOT_REQUIRE_APFS_CLONE` keeps from skipping. `.github/ci-path-classifier.js` owns
   fail-closed path routing and cross-lane
@@ -1042,7 +1068,10 @@ python -m mkdocs build --strict
   `@the-open-engine-company/zeroshot`, then invokes Python revision `1`.
 - Python revision `1` always produces its GitHub wheel release. PyPI publication is fail-closed by
   default and may be explicitly deferred with `publish_pypi: false`.
-- `.github/workflows/release-python.yml` may publish later SDK-only revisions.
+- The canonical release dispatches `.github/workflows/release-python.yml` on `main` as a standalone
+  run, binds the exact release commit/version and revision `1`, and waits for that returned run ID
+  before documentation. PyPI trusted publishing must remain in this standalone workflow, never in
+  a reusable workflow. The same entry point handles later SDK-only revisions and exact recovery.
 - `.github/workflows/docs.yml` publishes `main` as Current and canonical releases into `vX.Y/`
   after Python revision `1`; later SDK-only releases do not rebuild product documentation.
   The root always selects Current. Legacy `dev` and `stable` redirects stay outside the selector.

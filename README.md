@@ -24,7 +24,7 @@
 
 &nbsp;
 
-<a href="https://github.com/the-open-engine/zeroshot/stargazers"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/social/starred-by-dark.png"><img alt="Starred by engineers at Google, Meta, Shopify, Uber, Booking.com, GitHub, Cloudflare, Atlassian and JetBrains" src="docs/brand/social/starred-by-light.png" width="504"></picture></a>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/social/starred-by-dark.png"><img alt="Starred by engineers at 300+ companies, including Google, Microsoft, Amazon, NVIDIA, Meta, GitHub and Cloudflare" src="docs/brand/social/starred-by-light.png" width="435"></picture>
 
 </div>
 
@@ -51,7 +51,7 @@ matched a larger model's score at a median 58% of its cost. More examples on zer
 and [a research run](https://zeroshot.sh/#not-just-coding).
 
 The CLI is free and MIT licensed. Run locally, [self-host](#self-hosted-run-the-docker-target), or
-use [Zeroshot Platform](https://cloud.zeroshot.sh/docs).
+use [Zeroshot Platform](https://app.zeroshot.sh/docs).
 
 <div align="center">
   <a href="https://zeroshot.sh/#topology">
@@ -68,7 +68,7 @@ use [Zeroshot Platform](https://cloud.zeroshot.sh/docs).
 
 ## What users say
 
-> I used Zeroshot (my fork) for my last two contracts: a production line automation and control
+> I used Zeroshot for my last two contracts: a production line automation and control
 > system, and a multi-host sync and admin system for Webflow and Guesty. Very happy with it!
 >
 > — Mark Dingwall
@@ -163,7 +163,7 @@ For other harnesses and providers, see [Runtimes and connections](docs/concepts/
 ### Run on Zeroshot Platform
 
 Connect GitHub and bring your own model API keys.
-[Platform setup guide →](https://cloud.zeroshot.sh/docs)
+[Platform setup guide →](https://app.zeroshot.sh/docs)
 
 ## Build your own graph
 
@@ -234,7 +234,7 @@ zeroshot run \
 
 The CLI and UI share the same local profiles. See
 [UI setup](docs/getting-started/install.md#open-the-workspace-ui). For shared team configurations,
-see [organization profiles](https://cloud.zeroshot.sh/docs/connections-and-profiles).
+see [organization profiles](https://app.zeroshot.sh/docs/connections-and-profiles).
 
 ## What the built-in workflow does
 

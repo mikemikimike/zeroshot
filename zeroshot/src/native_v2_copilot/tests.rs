@@ -27,11 +27,13 @@ mod hosted;
 const INSTRUCTIONS: &str = "Return answer 42 using the required schema.";
 
 fn script() -> String {
-    std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/native_v2_copilot/tests/runtime.py"
-    ))
-    .unwrap()
+    openengine_cluster_testkit::fixture::python3_script(
+        &std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/native_v2_copilot/tests/runtime.py"
+        ))
+        .unwrap(),
+    )
 }
 
 fn binding(names: impl Iterator<Item = String>) -> NodeRuntimeBinding {
@@ -43,6 +45,8 @@ fn binding_for_model(names: impl Iterator<Item = String>, model: &str) -> NodeRu
         lane: None,
         model: crate::worker_catalog::ModelId::new(model).assert_value(),
         effort: None,
+        context_window: None,
+        max_tokens: None,
         session_scope: SessionScope::NodeInstance,
         connections: DeclaredConnections::single(
             "github",
@@ -490,6 +494,25 @@ async fn native_local_login_and_context_need_no_declared_token() {
 }
 
 #[tokio::test]
+async fn unsupported_requests_and_memory_hooks_are_answered_without_failing_the_turn() {
+    let fixture = Fixture::new("dispatch").await;
+    verified(complete(fixture.start(1).await).await.1);
+    let replies = fixture
+        .directory
+        .read("capture.dispatch")
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).assert_value())
+        .collect::<Vec<_>>();
+    assert_eq!(replies.len(), 3, "every dispatched request is answered");
+    assert_eq!(replies[0]["id"], 9001);
+    assert_eq!(replies[0]["error"]["code"], -32601);
+    for (reply, identifier) in replies[1..].iter().zip([9002, 9003]) {
+        assert_eq!(reply["id"], identifier);
+        assert!(reply["result"]["output"].is_null());
+    }
+}
+
+#[tokio::test]
 async fn ambient_local_token_crosses_private_rpc_only() {
     let fixture = Fixture::ambient_token().await;
     verified(complete(fixture.start(1).await).await.1);
@@ -618,6 +641,27 @@ async fn complete_with_deadline(
     (events, completion.map(|value| value.outcome))
 }
 
+fn method_count(capture: &[Value], method: &str) -> usize {
+    capture
+        .iter()
+        .filter(|message| message["method"] == method)
+        .count()
+}
+
+async fn assert_cancelled(handle: &mut NodeHandle) {
+    handle.cancel();
+    let completion = tokio::time::timeout(Duration::from_secs(10), handle.completion())
+        .await
+        .assert_value();
+    assert_eq!(completion, Err(NodeRunnerError::Cancelled));
+}
+
+async fn verified_events(fixture: &Fixture) -> Vec<DurableNodeEvent> {
+    let (events, outcome) = complete(fixture.start(1).await).await;
+    verified(outcome);
+    events
+}
+
 fn verified(outcome: Result<WorkerOutcome, NodeRunnerError>) {
     assert!(outcome.is_ok(), "Copilot outcome: {outcome:?}");
     assert!(
@@ -640,8 +684,7 @@ async fn verify_two_turns(fixture: &Fixture) {
 #[tokio::test]
 async fn schema_permissions_usage_and_resume_preserve_the_session() {
     let fixture = Fixture::new("permission").await;
-    let (events, outcome) = complete(fixture.start(1).await).await;
-    verified(outcome);
+    let events = verified_events(&fixture).await;
     assert!(events.iter().any(
         |event| matches!(event, DurableNodeEvent::TokenUsage(Some(usage))
         if usage.input_tokens.get() == 7 && usage.output_tokens.get() == 3
@@ -761,18 +804,9 @@ async fn malformed_output_receives_only_two_corrections_in_the_same_session() {
             assert_eq!(outcome.assert_value(), WorkerOutcome::malformed());
         }
         let capture = fixture.capture();
+        assert_eq!(method_count(&capture, "session.create"), 1);
         assert_eq!(
-            capture
-                .iter()
-                .filter(|message| message["method"] == "session.create")
-                .count(),
-            1
-        );
-        assert_eq!(
-            capture
-                .iter()
-                .filter(|message| message["method"] == "session.send")
-                .count(),
+            method_count(&capture, "session.send"),
             if mode == "correction" { 2 } else { 3 }
         );
     }
@@ -780,9 +814,19 @@ async fn malformed_output_receives_only_two_corrections_in_the_same_session() {
 
 #[tokio::test]
 async fn grammar_compilation_rate_limit_retries_after_backoff_and_resumes_the_session() {
-    let fixture = Fixture::new("grammar_rate_limit_once").await;
-    let (events, outcome) = complete(fixture.start(1).await).await;
-    verified(outcome);
+    struct HostContext;
+
+    impl crate::native_v2_runner::AgentContextProvider for HostContext {
+        fn context(&self) -> String {
+            "grammar retry host context".to_owned()
+        }
+    }
+
+    let mut fixture = Fixture::new("grammar_rate_limit_once").await;
+    fixture.runtime = fixture
+        .runtime
+        .with_agent_context(Some(Arc::new(HostContext)));
+    let events = verified_events(&fixture).await;
 
     assert!(events.iter().any(|event| matches!(
         event,
@@ -790,27 +834,19 @@ async fn grammar_compilation_rate_limit_retries_after_backoff_and_resumes_the_se
             if output.text.contains("Copilot grammar compilation rate limited; retrying")
     )));
     let capture = fixture.capture();
-    assert_eq!(
-        capture
-            .iter()
-            .filter(|message| message["method"] == "session.create")
-            .count(),
-        1
+    let prompts = capture
+        .iter()
+        .filter(|message| message["method"] == "session.send")
+        .map(|message| message["params"]["prompt"].as_str().assert_value())
+        .collect::<Vec<_>>();
+    assert_eq!(prompts.len(), 2);
+    assert_eq!(prompts[0], prompts[1]);
+    assert!(
+        prompts[0].starts_with("Runtime-owned execution context:\ngrammar retry host context\n\n")
     );
-    assert_eq!(
-        capture
-            .iter()
-            .filter(|message| message["method"] == "session.resume")
-            .count(),
-        1
-    );
-    assert_eq!(
-        capture
-            .iter()
-            .filter(|message| message["method"] == "session.send")
-            .count(),
-        2
-    );
+    assert_eq!(method_count(&capture, "session.create"), 1);
+    assert_eq!(method_count(&capture, "session.resume"), 1);
+    assert_eq!(method_count(&capture, "session.send"), 2);
     assert_eq!(
         capture
             .iter()
@@ -863,20 +899,8 @@ async fn grammar_compilation_rate_limit_retry_exhaustion_preserves_provider_erro
         3
     );
     let capture = fixture.capture();
-    assert_eq!(
-        capture
-            .iter()
-            .filter(|message| message["method"] == "session.send")
-            .count(),
-        4
-    );
-    assert_eq!(
-        capture
-            .iter()
-            .filter(|message| message["method"] == "session.resume")
-            .count(),
-        3
-    );
+    assert_eq!(method_count(&capture, "session.send"), 4);
+    assert_eq!(method_count(&capture, "session.resume"), 3);
 }
 
 #[tokio::test]
@@ -892,11 +916,7 @@ async fn grammar_compilation_rate_limit_drain_failure_is_terminal() {
     );
     assert!(error_output(&events).is_empty());
     assert_eq!(
-        fixture
-            .capture()
-            .iter()
-            .filter(|message| message["method"] == "session.send")
-            .count(),
+        method_count(&fixture.capture(), "session.send"),
         1,
         "a drain failure must not be retried as a grammar rate limit"
     );
@@ -920,17 +940,9 @@ async fn grammar_compilation_rate_limit_cancellation_during_backoff_does_not_res
             break;
         }
     }
-    handle.cancel();
-    let completion = tokio::time::timeout(Duration::from_secs(10), handle.completion())
-        .await
-        .assert_value();
-    assert_eq!(completion, Err(NodeRunnerError::Cancelled));
+    assert_cancelled(&mut handle).await;
     assert_eq!(
-        fixture
-            .capture()
-            .iter()
-            .filter(|message| message["method"] == "session.send")
-            .count(),
+        method_count(&fixture.capture(), "session.send"),
         1,
         "cancelling during backoff must not start another session.send"
     );
@@ -961,11 +973,7 @@ async fn fails_closed_on_protocol_identity_and_provider_errors() {
         assert!(!format!("{events:?} {error}").contains("gho_fake-secret"));
         if mode == "http_400" || mode == "http_400_stderr_grammar" {
             assert_eq!(
-                fixture
-                    .capture()
-                    .iter()
-                    .filter(|message| message["method"] == "session.send")
-                    .count(),
+                method_count(&fixture.capture(), "session.send"),
                 1,
                 "ordinary HTTP 400 responses must not be retried"
             );
@@ -1004,14 +1012,7 @@ async fn closed_input_after_an_accepted_answer_keeps_the_outcome() {
         let errors = error_output(&events);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("session detach failed after the accepted answer"));
-        assert_eq!(
-            fixture
-                .capture()
-                .iter()
-                .filter(|message| message["method"] == "session.send")
-                .count(),
-            1
-        );
+        assert_eq!(method_count(&fixture.capture(), "session.send"), 1);
     }
 }
 
@@ -1151,11 +1152,7 @@ async fn cancellation_preserves_usage_and_reaps_the_runtime() {
     let mut output = handle.take_initial_output().assert_value();
     let usage = output.recv_usage().await.assert_value().assert_value();
     assert_eq!(usage.input_tokens.get(), 7);
-    handle.cancel();
-    let completion = tokio::time::timeout(Duration::from_secs(10), handle.completion())
-        .await
-        .assert_value();
-    assert_eq!(completion, Err(NodeRunnerError::Cancelled));
+    assert_cancelled(&mut handle).await;
 }
 
 #[tokio::test]
